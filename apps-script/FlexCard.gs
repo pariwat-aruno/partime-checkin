@@ -227,6 +227,63 @@ function buildRegistrationCard(args) {
 }
 
 /**
+ * Card สำหรับเตือนสแกนหน้า — มีปุ่ม "ลงเวลาทันที" → เปิด LIFF checkin
+ * round 1: header cherry, "แจ้งเตือนสแกนหน้า"
+ * round 2: header cherry-dark, "⚠️ แจ้งเตือนครั้งสุดท้าย"
+ */
+function buildScanReminderCard(employeeName, slotLabel, isLast) {
+  const liffId = PropertiesService.getScriptProperties().getProperty('LIFF_ID_CHECKIN');
+  const liffUrl = 'https://liff.line.me/' + liffId;
+
+  const headerBg = isLast ? CHERRY_DARK : CHERRY;
+  const headerLabel = isLast ? '⚠️  แจ้งเตือนครั้งสุดท้าย' : 'แจ้งเตือนสแกนหน้า';
+
+  return {
+    type: 'flex',
+    altText: BRAND + ' — ' + headerLabel + ' — ' + slotLabel + ' — คุณ ' + employeeName,
+    contents: {
+      type: 'bubble', size: 'mega',
+      header: {
+        type: 'box', layout: 'vertical',
+        backgroundColor: headerBg, paddingAll: '14px',
+        contents: [
+          {
+            type: 'box', layout: 'horizontal', spacing: 'sm',
+            contents: [
+              { type: 'image', url: LOGO_URL, size: 'xxs', flex: 0, aspectMode: 'cover', aspectRatio: '1:1' },
+              { type: 'text', text: BRAND, color: '#ffffff', size: 'xxs', weight: 'bold', gravity: 'center', flex: 1 },
+            ],
+          },
+          { type: 'text', text: headerLabel, color: '#ffffff', weight: 'bold', size: 'lg', wrap: true, margin: 'md' },
+        ],
+      },
+      body: {
+        type: 'box', layout: 'vertical', spacing: 'sm',
+        contents: [
+          { type: 'text', text: 'ถึง คุณ ' + employeeName, color: TEXT, size: 'sm', wrap: true },
+          { type: 'text', text: 'กรุณาสแกนหน้าในรอบ', color: MUTED, size: 'sm', margin: 'md' },
+          {
+            type: 'box', layout: 'vertical',
+            backgroundColor: '#fbeaed', cornerRadius: '8px', paddingAll: '14px', margin: 'sm',
+            contents: [
+              { type: 'text', text: slotLabel, color: CHERRY, weight: 'bold', size: 'xxl', align: 'center' },
+              { type: 'text', text: 'ภายใน 10 นาที', color: CHERRY_DARK, size: 'sm', align: 'center', margin: 'sm' },
+            ],
+          },
+        ],
+      },
+      footer: {
+        type: 'box', layout: 'vertical',
+        contents: [{
+          type: 'button', style: 'primary', color: CHERRY, height: 'md',
+          action: { type: 'uri', label: 'ลงเวลาทันที', uri: liffUrl },
+        }],
+      },
+    },
+  };
+}
+
+/**
  * Card สำหรับเตือนเลิกงาน 17:00 — สีเหลืองเตือนชัดเจน + ! emoji
  */
 function buildEndOfWorkCard() {

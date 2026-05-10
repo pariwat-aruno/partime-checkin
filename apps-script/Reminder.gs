@@ -188,19 +188,16 @@ function sendSlotReminder_(cfg, slot, today, round) {
     });
   }
 
-  // text per employee — มีชื่อพนักงาน
-  const lastTag = round === 2 ? 'ครั้งสุดท้าย' : '';
+  // flex card per employee — มีปุ่ม "ลงเวลาทันที" เปิด LIFF
+  const isLast = round === 2;
 
   let sent = 0;
   actives.forEach(function (a) {
     if (scanned[a.id]) return;
     if (!a.userId) return;
     if (isOwner(a.userId)) return;  // ห้ามส่งหา owner
-    const message =
-      'แจ้งเตือน' + lastTag + 'จาก บริษัทฯ ถึง คุณ ' + (a.name || a.id) + '\n\n' +
-      'กรุณาสแกนหน้าในรอบ ' + slotLabel + ' ภายใน 10 นาที\n\n' +
-      'บริษัท วอร์ด้า สกินแคร์ จำกัด';
-    pushText(a.userId, message);
+    const card = buildScanReminderCard(a.name || a.id, slotLabel, isLast);
+    pushMessage(a.userId, [card]);
     sent++;
   });
   logInfo('sendSlotReminder', 'slot=' + slot + ' round=' + round + ' sent=' + sent, '');
