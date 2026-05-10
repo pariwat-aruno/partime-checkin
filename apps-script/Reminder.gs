@@ -39,6 +39,31 @@ function testTickReminders() {
   tickReminders();
 }
 
+/** ส่ง reminder slot 1 ทันที — bypass time check (สำหรับทดสอบ) */
+function testSendSlotReminderSlot1() {
+  const cfg = getConfig();
+  sendSlotReminder_(cfg, 1, todayBangkok(), 1);
+  Logger.log('ส่ง slot 1 reminder round 1 เรียบร้อย ดู LINE chat');
+}
+function testSendSlotReminderSlot2() {
+  const cfg = getConfig();
+  sendSlotReminder_(cfg, 2, todayBangkok(), 1);
+}
+function testSendSlotReminderSlot3() {
+  const cfg = getConfig();
+  sendSlotReminder_(cfg, 3, todayBangkok(), 1);
+}
+function testSendSlotReminderSlot4() {
+  const cfg = getConfig();
+  sendSlotReminder_(cfg, 4, todayBangkok(), 1);
+}
+
+/** ส่ง broadcast เลิกงานทันที — bypass time check */
+function testSendEndOfWork() {
+  sendEndOfWorkBroadcast_();
+  Logger.log('ส่ง end-of-work broadcast เรียบร้อย ดู LINE chat ของ active employees');
+}
+
 function tickReminders() {
   try {
     const cfg = getConfig();
@@ -163,22 +188,17 @@ function sendSlotReminder_(cfg, slot, today, round) {
     });
   }
 
-  // text ตามรอบ
-  const headLine = round === 2
-    ? 'แจ้งเตือนครั้งสุดท้าย'
-    : 'แจ้งเตือน';
-  const message =
-    headLine + ' บริษัท วอร์ด้า สกินแคร์ จำกัด\n\n' +
-    'กรุณาสแกนหน้า "' + slotLabel + '" ตอนนี้\n' +
-    'เลยกำหนดเวลามาแล้ว ' + (round === 2 ? '20' : '10') + ' นาที\n\n' +
-    (round === 2
-      ? 'ถ้าไม่สแกน slot นี้จะถือว่าไม่มาทำงานในช่วงเวลานี้ — เจ้าของอาจหักค่าจ้าง'
-      : 'ถ้าไม่สแกนจะมีการเตือนซ้ำอีกครั้งใน 10 นาที');
+  // text per employee — มีชื่อพนักงาน
+  const lastTag = round === 2 ? 'ครั้งสุดท้าย' : '';
 
   let sent = 0;
   actives.forEach(function (a) {
     if (scanned[a.id]) return;
     if (!a.userId) return;
+    const message =
+      'แจ้งเตือน' + lastTag + 'จาก บริษัทฯ ถึง คุณ ' + (a.name || a.id) + '\n\n' +
+      'กรุณาสแกนหน้าในรอบ ' + slotLabel + ' ภายใน 10 นาที\n\n' +
+      'บริษัท วอร์ด้า สกินแคร์ จำกัด';
     pushText(a.userId, message);
     sent++;
   });
