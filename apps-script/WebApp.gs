@@ -1,114 +1,226 @@
 /**
- * WebApp.gs — entry point ของ Apps Script Web App
+ * WebApp.gs — entry point ของ Apps Script Web App (TASK-14, TASK-19)
  *
- * ตอนนี้ Apps Script เป็น API-only — LIFF frontend host ที่ GitHub Pages
- * (https://pariwat-aruno.github.io/partime-checkin/)
+ * Apps Script เป็น API-only — LIFF frontend host ที่ GitHub Pages
  *
- * doGet  — เปิดในเบราว์เซอร์ปกติเพื่อเช็ค deployment ยังออนไลน์
- * doPost — รับ LIFF API + LINE webhook
- *
- * doPost ตัวเต็ม (route action register/checkin/getBalance/postback) จะมาใน TASK-14
+ * doGet  — health check
+ * doPost — รับ 2 ชนิด:
+ *   1. LINE webhook event (มี field `events`)
+ *   2. LIFF action (มี field `action` + `payload`)
  */
 
 function doGet(e) {
-  return ContentService.createTextOutput(JSON.stringify({
+  return jsonOut_({
     ok: true,
     service: 'partime-checkin',
+    version: '0.2',
     note: 'API only. UI host ที่ GitHub Pages',
-  })).setMimeType(ContentService.MimeType.JSON);
+  });
 }
 
 function doPost(e) {
+  let body;
   try {
-    const body = JSON.parse(e.postData.contents);
+    body = JSON.parse(e.postData.contents);
+  } catch (err) {
+    logError('doPost', 'invalid JSON: ' + err.message, e && e.postData ? e.postData.contents : '');
+    return jsonOut_({ ok: false, error: 'invalid_json' });
+  }
 
-    // LINE webhook event มาเป็น { events: [...] }
+  try {
+    // Webhook event (LINE)
     if (Array.isArray(body.events)) {
-      body.events.forEach(function (ev) {
-        if (ev.type === 'message' && ev.message && ev.message.type === 'text') {
-          handleMessageEvent_(ev);
-        }
-      });
+      body.events.forEach(handleLineEvent_);
       return jsonOut_({ ok: true });
     }
 
-    // LIFF action จะมาเป็น { action: '...', payload: {...} } — TASK-14 จะ route
+    // LIFF action
+    if (body.action) {
+      const result = routeAction_(body.action, body.payload || {});
+      return jsonOut_(result);
+    }
+
     return jsonOut_({ ok: false, error: 'unknown_request' });
   } catch (err) {
-    logToSheet_('error', 'doPost', err.message, e && e.postData ? e.postData.contents : '');
+    logError('doPost', err.message, body);
     return jsonOut_({ ok: false, error: err.message });
   }
 }
 
+/** route LIFF action → handler */
+function routeAction_(action, payload) {
+  switch (action) {
+    case 'register':     return register(payload);
+    case 'checkin':      return checkin(payload);
+    case 'getBalance':   return getBalance(payload);
+    case 'closePeriod':  return closePeriod(payload);
+    default:
+      return { ok: false, error: 'unknown_action', action: action };
+  }
+}
+
+/** จัดการ LINE event ทุกชนิด */
+function handleLineEvent_(ev) {
+  if (!ev || !ev.type) return;
+
+  if (ev.type === 'message' && ev.message && ev.message.type === 'text') {
+    return handleMessageEvent_(ev);
+  }
+
+  if (ev.type === 'postback') {
+    return handlePostback_(ev);
+  }
+
+  if (ev.type === 'follow') {
+    // user เพิ่ม bot เป็นเพื่อน → ส่งข้อความ welcome
+    return replyText(ev.replyToken,
+      'ยินดีต้อนรับสู่ partime-checkin\n' +
+      '- กดเมนู "ลงทะเบียน" เพื่อสมัครครั้งแรก\n' +
+      '- หรือพิมพ์ "id" เพื่อรับ LINE User ID ของคุณ');
+  }
+}
+
 /**
- * จัดการ message event (ใช้ตอนนี้แค่ตอบ userId เมื่อพิมพ์ "id")
- * ตัวเต็มจะอยู่ใน TASK-19
+ * message event:
+ *   "id" → reply userId
+ *   อื่น ๆ → reply hint
  */
 function handleMessageEvent_(ev) {
   const userId = ev.source && ev.source.userId;
   const text = (ev.message.text || '').trim();
-  const replyToken = ev.replyToken;
+  logInfo('message', text, { userId: userId });
 
-  logToSheet_('info', 'message', text, JSON.stringify({ userId: userId }));
-
-  let replyText;
   if (text.toLowerCase() === 'id') {
-    replyText =
+    return replyText(ev.replyToken,
       'LINE User ID ของคุณ:\n\n' + userId + '\n\n' +
-      'copy ส่งให้พี่ปุ้ย (เจ้าของ) เพื่อตั้งเป็น OWNER_LINE_USER_ID';
-  } else {
-    replyText = 'พิมพ์ "id" เพื่อรับ LINE User ID ของคุณ';
+      'copy ส่งให้พี่ปุ้ย (เจ้าของ) เพื่อตั้งเป็น OWNER_LINE_USER_ID');
   }
 
-  replyMessage_(replyToken, replyText);
+  return replyText(ev.replyToken,
+    'พิมพ์ "id" เพื่อรับ LINE User ID ของคุณ\n' +
+    'หรือใช้เมนูด้านล่างเพื่อ ลงทะเบียน / เช็คอิน / ดูยอด');
 }
 
 /**
- * เรียก LINE Reply API — ใช้ access token จาก Script Properties
- * (LineApi.gs ตัวเต็มจะมาใน TASK-12)
+ * TASK-19 — handle postback จาก flex card อนุมัติ
+ *
+ * data format:
+ *   action=approve&id=CHK-...&type=full
+ *   action=approve&id=CHK-...&type=half
+ *   action=reject&id=CHK-...
+ *
+ * verify: เฉพาะ OWNER_LINE_USER_ID เท่านั้นที่กดได้
  */
-function replyMessage_(replyToken, text) {
-  const token = PropertiesService.getScriptProperties().getProperty('LINE_CHANNEL_ACCESS_TOKEN');
-  if (!token) {
-    logToSheet_('error', 'replyMessage', 'LINE_CHANNEL_ACCESS_TOKEN ไม่ถูกตั้งค่า', '');
-    return;
+function handlePostback_(ev) {
+  const userId = ev.source && ev.source.userId;
+  const ownerUserId = PropertiesService.getScriptProperties().getProperty('OWNER_LINE_USER_ID');
+  if (userId !== ownerUserId) {
+    logWarn('postback', 'unauthorized user', { userId: userId });
+    return replyText(ev.replyToken, 'คุณไม่มีสิทธิ์อนุมัติ — เฉพาะเจ้าของเท่านั้น');
   }
-  const payload = {
-    replyToken: replyToken,
-    messages: [{ type: 'text', text: text }],
-  };
-  const res = UrlFetchApp.fetch('https://api.line.me/v2/bot/message/reply', {
-    method: 'post',
-    contentType: 'application/json',
-    headers: { Authorization: 'Bearer ' + token },
-    payload: JSON.stringify(payload),
-    muteHttpExceptions: true,
+
+  const data = parsePostbackData_(ev.postback.data);
+  if (!data.action || !data.id) {
+    logWarn('postback', 'invalid data', ev.postback.data);
+    return replyText(ev.replyToken, 'ข้อมูลผิดพลาด');
+  }
+
+  if (data.action === 'approve' || data.action === 'reject') {
+    const result = updateCheckinStatus_(data.id, data.action, data.type);
+    if (!result.ok) {
+      return replyText(ev.replyToken, '❌ ' + result.error);
+    }
+    return replyText(ev.replyToken, formatApprovalReply_(result));
+  }
+
+  return replyText(ev.replyToken, 'unknown action: ' + data.action);
+}
+
+function parsePostbackData_(s) {
+  const out = {};
+  if (!s) return out;
+  s.split('&').forEach(function (pair) {
+    const kv = pair.split('=');
+    out[kv[0]] = decodeURIComponent(kv[1] || '');
   });
-  if (res.getResponseCode() !== 200) {
-    logToSheet_('error', 'replyMessage', 'LINE reply ' + res.getResponseCode(), res.getContentText());
-  }
+  return out;
 }
 
 /**
- * helper minimal — เขียน log ลง Sheet Logs
- * (Logger.gs ตัวเต็มจะมาใน TASK-10)
+ * อัปเดต Checkins row → status, day_type, wage, approved_at
+ *
+ * approve full → status=approved, day_type=full, wage=400 (จาก config)
+ * approve half → status=approved, day_type=half, wage=200
+ * reject       → status=rejected, day_type=none, wage=0
  */
-function logToSheet_(level, fnName, message, payload) {
-  try {
-    const sheetId = PropertiesService.getScriptProperties().getProperty('SHEET_ID');
-    if (!sheetId) return;
-    const sh = SpreadsheetApp.openById(sheetId).getSheetByName('Logs');
-    if (!sh) return;
-    sh.appendRow([
-      new Date().toISOString(),
-      level,
-      fnName,
-      message,
-      payload || '',
-    ]);
-  } catch (err) {
-    console.error('logToSheet failed', err);
+function updateCheckinStatus_(checkinId, action, type) {
+  const sheetId = PropertiesService.getScriptProperties().getProperty('SHEET_ID');
+  const sh = SpreadsheetApp.openById(sheetId).getSheetByName('Checkins');
+  const last = sh.getLastRow();
+  if (last < 2) return { ok: false, error: 'no_checkins' };
+
+  const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+  const ids = sh.getRange(2, 1, last - 1, 1).getValues();
+  let rowIdx = -1;
+  for (let i = 0; i < ids.length; i++) {
+    if (ids[i][0] === checkinId) { rowIdx = i + 2; break; }
   }
+  if (rowIdx < 0) return { ok: false, error: 'checkin_not_found: ' + checkinId };
+
+  const cfg = getConfig();
+  let status, dayType, wage;
+  if (action === 'approve' && type === 'full') {
+    status = 'approved'; dayType = 'full'; wage = Number(cfg.wage_full_day);
+  } else if (action === 'approve' && type === 'half') {
+    status = 'approved'; dayType = 'half'; wage = Number(cfg.wage_half_day);
+  } else if (action === 'reject') {
+    status = 'rejected'; dayType = 'none'; wage = 0;
+  } else {
+    return { ok: false, error: 'invalid_combo' };
+  }
+
+  const iStatus = headers.indexOf('status') + 1;
+  const iDayType = headers.indexOf('day_type') + 1;
+  const iWage = headers.indexOf('wage') + 1;
+  const iApprovedAt = headers.indexOf('approved_at') + 1;
+  const iEmp = headers.indexOf('employee_id');
+  const iDate = headers.indexOf('checkin_date');
+
+  sh.getRange(rowIdx, iStatus).setValue(status);
+  sh.getRange(rowIdx, iDayType).setValue(dayType);
+  sh.getRange(rowIdx, iWage).setValue(wage);
+  sh.getRange(rowIdx, iApprovedAt).setValue(nowBangkok());
+
+  // ดึงชื่อ employee สำหรับ reply
+  const rowData = sh.getRange(rowIdx, 1, 1, sh.getLastColumn()).getValues()[0];
+  const empId = rowData[iEmp];
+  const date = rowData[iDate];
+  const dateStr = (date instanceof Date)
+    ? Utilities.formatDate(date, 'Asia/Bangkok', 'd MMM yyyy')
+    : String(date);
+
+  const emp = findEmployeeById_(empId);
+  const empName = emp ? emp.display_name : empId;
+
+  logInfo('postback', action, { checkinId: checkinId, type: type, employeeId: empId });
+
+  return {
+    ok: true,
+    checkinId: checkinId,
+    employeeName: empName,
+    date: dateStr,
+    status: status,
+    dayType: dayType,
+    wage: wage,
+  };
+}
+
+function formatApprovalReply_(r) {
+  if (r.status === 'rejected') {
+    return '✅ ไม่อนุมัติเรียบร้อย\n' + r.employeeName + ' — ' + r.date;
+  }
+  const t = r.dayType === 'full' ? 'เต็มวัน' : 'ครึ่งวัน';
+  return '✅ อนุมัติเรียบร้อย\n' + r.employeeName + ' — ' + r.date + '\n' + t + ' ' + r.wage + ' บาท';
 }
 
 function jsonOut_(obj) {
