@@ -182,7 +182,7 @@
         renderList(result.employees, result.period);
       } catch (e) {
         if (e.code === 'not_owner') {
-          showError(errEl, 'เฉพาะเจ้าของเท่านั้นที่ใช้หน้านี้ได้');
+          showError(errEl, 'คุณไม่มีสิทธิ์เข้าถึงหน้านี้');
           listEl.innerHTML = '';
         } else {
           showError(errEl, e.message || e.code);

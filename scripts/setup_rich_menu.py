@@ -21,6 +21,7 @@ from PIL import Image, ImageDraw, ImageFont
 LIFF_REGISTER = "2010027935-yGV4yPSO"
 LIFF_CHECKIN = "2010027935-VNfQm4KC"
 LIFF_BALANCE = "2010027935-GqOSphZC"
+LIFF_ADMIN   = "2010027935-J0G7Diq4"
 
 MENU_NAME = "partime-checkin-main"
 IMAGE_PATH = os.path.join(os.path.dirname(__file__), "rich_menu.png")
@@ -31,12 +32,13 @@ WIDTH = 2500
 HEIGHT = 843
 
 # cherry red palette — บริษัท วอร์ด้า สกินแคร์ จำกัด
-# 2 sections (ลงทะเบียนใช้ bot command "ลงทะเบียน" แทน — ใช้ไม่บ่อย)
+# 3 sections — ปุ่ม Owner ขวาสุด สีต่างเพื่อแยกชัด
 SECTIONS = [
     {"label": "เช็คอิน",   "color": (200, 16,  46), "liff": LIFF_CHECKIN},
     {"label": "ดูยอด",     "color": (154, 12,  36), "liff": LIFF_BALANCE},
+    {"label": "Owner",     "color": ( 55, 65,  81), "liff": LIFF_ADMIN},  # dark neutral
 ]
-SECTION_W = WIDTH // len(SECTIONS)  # auto: 2 sections = 1250 each
+SECTION_W = WIDTH // len(SECTIONS)  # 3 sections ≈ 833 each
 BRAND_TEXT = "บริษัท วอร์ด้า สกินแคร์ จำกัด"
 
 THAI_FONT_PATHS = [
