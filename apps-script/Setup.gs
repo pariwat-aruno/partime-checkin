@@ -171,6 +171,11 @@ const CONFIG_DEFAULTS = {
   slot2_label: 'ก่อนพักเที่ยง',
   slot3_label: 'บ่ายโมง',
   slot4_label: 'เลิกงาน',
+  // เวลาที่ระบบคาดหวังให้สแกน — ใช้คำนวณ reminder (เตือนที่ +10 และ +20 นาที)
+  slot1_expected: '08:00',
+  slot2_expected: '12:00',
+  slot3_expected: '13:00',
+  slot4_expected: '17:00',  // = เวลาเลิกงาน + broadcast end-of-work
 };
 
 /**
