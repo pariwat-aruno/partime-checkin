@@ -31,6 +31,14 @@ body {
   margin-bottom: 6px; font-weight: 600;
 }
 
+.logo {
+  display: block;
+  width: 72px; height: 72px;
+  margin: 0 auto 10px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
 .card {
   max-width: 480px; margin: 0 auto;
   background: var(--white);

@@ -24,6 +24,7 @@ LIFF_BALANCE = "2010027935-GqOSphZC"
 
 MENU_NAME = "partime-checkin-main"
 IMAGE_PATH = os.path.join(os.path.dirname(__file__), "rich_menu.png")
+LOGO_PATH = os.path.join(os.path.dirname(__file__), "..", "liff", "img", "logo.jpg")
 
 # ขนาดมาตรฐาน rich menu (LINE บังคับ 2500x843 หรือ 2500x1686)
 WIDTH = 2500
@@ -89,15 +90,34 @@ def make_image():
         ty = (main_h - text_h) // 2 - 10
         draw.text((cx - text_w // 2, ty), sec["label"], font=label_font, fill="white")
 
-    # แถบ brand ด้านล่าง — สีอ่อน + cherry text
+    # แถบ brand ด้านล่าง — สีอ่อน + logo + brand text
     draw.rectangle([0, main_h, WIDTH, HEIGHT], fill=(249, 250, 251))  # near-white
     draw.line([0, main_h, WIDTH, main_h], fill=(229, 231, 235), width=2)
+
     bbox = draw.textbbox((0, 0), BRAND_TEXT, font=brand_font)
     bw = bbox[2] - bbox[0]
     bh = bbox[3] - bbox[1]
-    bx = (WIDTH - bw) // 2
-    by = main_h + (BRAND_BAND_H - bh) // 2 - 8
-    draw.text((bx, by), BRAND_TEXT, font=brand_font, fill=(154, 12, 36))
+    band_cy = main_h + BRAND_BAND_H // 2
+
+    # logo (round-cropped) ด้านซ้ายของ text
+    try:
+        from PIL import ImageOps
+        logo_size = 56
+        logo = Image.open(LOGO_PATH).convert("RGB").resize((logo_size, logo_size))
+        # mask วงกลม
+        mask = Image.new("L", (logo_size, logo_size), 0)
+        ImageDraw.Draw(mask).ellipse([0, 0, logo_size, logo_size], fill=255)
+        # composite
+        logo_x = (WIDTH - bw - logo_size - 14) // 2
+        logo_y = band_cy - logo_size // 2
+        img.paste(logo, (logo_x, logo_y), mask)
+        text_x = logo_x + logo_size + 14
+    except Exception as e:
+        print(f"[warn] logo paste failed: {e}")
+        text_x = (WIDTH - bw) // 2
+
+    text_y = band_cy - bh // 2 - 8
+    draw.text((text_x, text_y), BRAND_TEXT, font=brand_font, fill=(154, 12, 36))
 
     img.save(IMAGE_PATH, format="PNG")
     print(f"เขียนรูป {IMAGE_PATH} ({WIDTH}x{HEIGHT})")

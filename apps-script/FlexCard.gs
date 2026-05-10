@@ -8,6 +8,7 @@
  */
 
 const BRAND = 'บริษัท วอร์ด้า กินแคร์';
+const LOGO_URL = 'https://pariwat-aruno.github.io/partime-checkin/img/logo.jpg';
 const CHERRY      = '#c8102e';
 const CHERRY_DARK = '#9a0c24';
 const TEXT        = '#111827';
@@ -95,8 +96,14 @@ function buildApprovalCard(args) {
         type: 'box', layout: 'vertical',
         backgroundColor: headerBg, paddingAll: '14px',
         contents: [
-          { type: 'text', text: BRAND, color: '#ffffff', size: 'xxs', weight: 'bold' },
-          { type: 'text', text: headerLabel, color: '#ffffff', weight: 'bold', size: 'lg', wrap: true, margin: 'sm' },
+          {
+            type: 'box', layout: 'horizontal', spacing: 'sm',
+            contents: [
+              { type: 'image', url: LOGO_URL, size: 'xxs', flex: 0, aspectMode: 'cover', aspectRatio: '1:1' },
+              { type: 'text', text: BRAND, color: '#ffffff', size: 'xxs', weight: 'bold', gravity: 'center', flex: 1 },
+            ],
+          },
+          { type: 'text', text: headerLabel, color: '#ffffff', weight: 'bold', size: 'lg', wrap: true, margin: 'md' },
         ],
       },
       body: {
@@ -138,8 +145,14 @@ function buildScanProgressCard(args) {
         type: 'box', layout: 'vertical',
         backgroundColor: headerBg, paddingAll: '12px',
         contents: [
-          { type: 'text', text: BRAND, color: '#ffffff', size: 'xxs', weight: 'bold' },
-          { type: 'text', text: headerLabel, color: '#ffffff', weight: 'bold', size: 'md', wrap: true, margin: 'sm' },
+          {
+            type: 'box', layout: 'horizontal', spacing: 'sm',
+            contents: [
+              { type: 'image', url: LOGO_URL, size: 'xxs', flex: 0, aspectMode: 'cover', aspectRatio: '1:1' },
+              { type: 'text', text: BRAND, color: '#ffffff', size: 'xxs', weight: 'bold', gravity: 'center', flex: 1 },
+            ],
+          },
+          { type: 'text', text: headerLabel, color: '#ffffff', weight: 'bold', size: 'md', wrap: true, margin: 'md' },
           { type: 'text', text: time + '  •  ' + args.displayName, color: '#ffffff', size: 'xs', margin: 'sm' },
         ],
       },
@@ -171,8 +184,14 @@ function buildRegistrationCard(args) {
         type: 'box', layout: 'vertical',
         backgroundColor: CHERRY, paddingAll: '14px',
         contents: [
-          { type: 'text', text: BRAND, color: '#ffffff', size: 'xxs', weight: 'bold' },
-          { type: 'text', text: 'พาร์ทไทม์ลงทะเบียนใหม่', color: '#ffffff', weight: 'bold', size: 'lg', margin: 'sm' },
+          {
+            type: 'box', layout: 'horizontal', spacing: 'sm',
+            contents: [
+              { type: 'image', url: LOGO_URL, size: 'xxs', flex: 0, aspectMode: 'cover', aspectRatio: '1:1' },
+              { type: 'text', text: BRAND, color: '#ffffff', size: 'xxs', weight: 'bold', gravity: 'center', flex: 1 },
+            ],
+          },
+          { type: 'text', text: 'พาร์ทไทม์ลงทะเบียนใหม่', color: '#ffffff', weight: 'bold', size: 'lg', margin: 'md' },
           { type: 'text', text: args.employeeId, color: '#ffffff', size: 'sm', margin: 'sm' },
         ],
       },
