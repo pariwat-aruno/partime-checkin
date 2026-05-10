@@ -195,6 +195,7 @@ function sendSlotReminder_(cfg, slot, today, round) {
   actives.forEach(function (a) {
     if (scanned[a.id]) return;
     if (!a.userId) return;
+    if (isOwner(a.userId)) return;  // ห้ามส่งหา owner
     const message =
       'แจ้งเตือน' + lastTag + 'จาก บริษัทฯ ถึง คุณ ' + (a.name || a.id) + '\n\n' +
       'กรุณาสแกนหน้าในรอบ ' + slotLabel + ' ภายใน 10 นาที\n\n' +
@@ -223,10 +224,11 @@ function sendEndOfWorkBroadcast_() {
   let sent = 0;
   ed.forEach(function (row) {
     if (row[iActive] === true || String(row[iActive]).toLowerCase() === 'true') {
-      if (row[iLine]) {
-        pushText(row[iLine], message);
-        sent++;
-      }
+      const uid = row[iLine];
+      if (!uid) return;
+      if (isOwner(uid)) return;  // ห้ามส่งหา owner
+      pushText(uid, message);
+      sent++;
     }
   });
   logInfo('sendEndOfWorkBroadcast', 'sent=' + sent, '');
