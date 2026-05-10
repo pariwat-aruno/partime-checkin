@@ -206,7 +206,7 @@ function sendSlotReminder_(cfg, slot, today, round) {
   logInfo('sendSlotReminder', 'slot=' + slot + ' round=' + round + ' sent=' + sent, '');
 }
 
-/** broadcast เลิกงาน — push หา ALL active employees */
+/** broadcast เลิกงาน — push flex card สีเหลืองหา active employees (ยกเว้น owner) */
 function sendEndOfWorkBroadcast_() {
   const sheetId = PropertiesService.getScriptProperties().getProperty('SHEET_ID');
   const empSh = SpreadsheetApp.openById(sheetId).getSheetByName('Employees');
@@ -216,10 +216,7 @@ function sendEndOfWorkBroadcast_() {
   const iLine = eh.indexOf('line_user_id');
   const iActive = eh.indexOf('is_active');
 
-  const message =
-    'แจ้งเตือนเลิกงาน บริษัท วอร์ด้า สกินแคร์ จำกัด\n\n' +
-    'ถึงเวลาเลิกงานแล้ว ให้ออกจากออฟิศทันที\n\n' +
-    'หากไม่ได้รับอนุญาตให้ทำงานล่วงเวลา บริษัทฯ จะไม่รับผิดชอบค่าล่วงเวลาทุกกรณี';
+  const card = buildEndOfWorkCard();
 
   let sent = 0;
   ed.forEach(function (row) {
@@ -227,7 +224,7 @@ function sendEndOfWorkBroadcast_() {
       const uid = row[iLine];
       if (!uid) return;
       if (isOwner(uid)) return;  // ห้ามส่งหา owner
-      pushText(uid, message);
+      pushMessage(uid, [card]);
       sent++;
     }
   });

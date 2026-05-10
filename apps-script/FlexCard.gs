@@ -14,6 +14,8 @@ const CHERRY_DARK = '#9a0c24';
 const TEXT        = '#111827';
 const MUTED       = '#6b7280';
 const WARNING     = '#d97706';
+const WARNING_BG  = '#fef3c7';
+const AMBER       = '#fbbc04';
 const REJECT      = '#374151';
 
 function buildApprovalCard(args) {
@@ -219,6 +221,69 @@ function buildRegistrationCard(args) {
           type: 'text', size: 'xs', color: MUTED, wrap: true, align: 'center',
           text: 'ตรวจสอบในระบบ — ระงับด้วย is_active=FALSE ใน Sheet ถ้าไม่ผ่าน',
         }],
+      },
+    },
+  };
+}
+
+/**
+ * Card สำหรับเตือนเลิกงาน 17:00 — สีเหลืองเตือนชัดเจน + ! emoji
+ */
+function buildEndOfWorkCard() {
+  return {
+    type: 'flex',
+    altText: BRAND + ' — ⚠️ ถึงเวลาเลิกงาน — ออกจากออฟิศทันที',
+    contents: {
+      type: 'bubble', size: 'mega',
+      header: {
+        type: 'box', layout: 'vertical',
+        backgroundColor: AMBER, paddingAll: '16px',
+        contents: [
+          {
+            type: 'box', layout: 'horizontal', spacing: 'sm',
+            contents: [
+              { type: 'image', url: LOGO_URL, size: 'xxs', flex: 0, aspectMode: 'cover', aspectRatio: '1:1' },
+              { type: 'text', text: BRAND, color: '#1f1300', size: 'xxs', weight: 'bold', gravity: 'center', flex: 1 },
+            ],
+          },
+          {
+            type: 'text', text: '⚠️  แจ้งเตือนเลิกงาน',
+            color: '#1f1300', weight: 'bold', size: 'xl', wrap: true, margin: 'md',
+          },
+        ],
+      },
+      body: {
+        type: 'box', layout: 'vertical', spacing: 'md',
+        backgroundColor: WARNING_BG,
+        paddingAll: '18px',
+        contents: [
+          {
+            type: 'text',
+            text: 'ถึงเวลาเลิกงานแล้ว',
+            color: WARNING, weight: 'bold', size: 'lg', align: 'center', wrap: true,
+          },
+          {
+            type: 'text',
+            text: 'ให้ออกจากออฟิศทันที',
+            color: TEXT, weight: 'bold', size: 'md', align: 'center', wrap: true, margin: 'sm',
+          },
+          { type: 'separator', margin: 'lg', color: AMBER },
+          {
+            type: 'box', layout: 'vertical', margin: 'lg',
+            paddingAll: '12px', backgroundColor: '#ffffff', cornerRadius: '6px',
+            contents: [
+              {
+                type: 'text', text: '⚠️  คำเตือนสำคัญ',
+                color: WARNING, weight: 'bold', size: 'sm',
+              },
+              {
+                type: 'text',
+                text: 'หากไม่ได้รับอนุญาตให้ทำงานล่วงเวลา บริษัทฯ จะไม่รับผิดชอบค่าล่วงเวลาทุกกรณี',
+                color: TEXT, size: 'sm', wrap: true, margin: 'sm',
+              },
+            ],
+          },
+        ],
       },
     },
   };
