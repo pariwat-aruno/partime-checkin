@@ -83,6 +83,7 @@ function handleLineEvent_(ev) {
 /**
  * message event:
  *   "id" → reply userId
+ *   "รอ" / "pending" → reply carousel ของ pending checkins (เฉพาะเจ้าของ)
  *   อื่น ๆ → reply hint
  */
 function handleMessageEvent_(ev) {
@@ -96,9 +97,132 @@ function handleMessageEvent_(ev) {
       'copy ส่งให้พี่ปุ้ย (เจ้าของ) เพื่อตั้งเป็น OWNER_LINE_USER_ID');
   }
 
+  const lower = text.toLowerCase();
+  if (lower === 'รอ' || lower === 'pending' || lower === 'รออนุมัติ') {
+    return replyPendingApprovals_(ev);
+  }
+
   return replyText(ev.replyToken,
-    'พิมพ์ "id" เพื่อรับ LINE User ID ของคุณ\n' +
-    'หรือใช้เมนูด้านล่างเพื่อ ลงทะเบียน / เช็คอิน / ดูยอด');
+    'พิมพ์ "id" รับ LINE User ID\n' +
+    'พิมพ์ "รอ" ดูรายการรออนุมัติ (เฉพาะเจ้าของ)\n' +
+    'หรือใช้เมนูด้านล่าง: ลงทะเบียน / เช็คอิน / ดูยอด');
+}
+
+/**
+ * เจ้าของพิมพ์ "รอ" → ตอบ carousel flex ของ pending checkins ทั้งหมด
+ * (รวมปุ่มอนุมัติ/ไม่อนุมัติเดิม)
+ *
+ * LINE limit: carousel max 12 bubble — cap ที่ 10 + ส่งข้อความบอกถ้าเหลือ
+ */
+function replyPendingApprovals_(ev) {
+  const userId = ev.source && ev.source.userId;
+  const ownerUserId = PropertiesService.getScriptProperties().getProperty('OWNER_LINE_USER_ID');
+  if (userId !== ownerUserId) {
+    return replyText(ev.replyToken, 'เฉพาะเจ้าของเท่านั้นที่ดูรายการรออนุมัติได้');
+  }
+
+  const pendingList = listPendingCheckins_();
+  if (pendingList.length === 0) {
+    return replyText(ev.replyToken, '✅ ไม่มีรายการรออนุมัติ');
+  }
+
+  const cfg = getConfig();
+  const radius = Number(cfg.geofence_radius_m);
+  const MAX_CAROUSEL = 10;
+
+  const bubbles = pendingList.slice(0, MAX_CAROUSEL).map(function (item) {
+    const card = buildApprovalCard({
+      checkinId: item.checkin_id,
+      displayName: item.display_name,
+      phone: item.phone,
+      selfieUrl: item.selfie_url,
+      referenceSelfieUrl: item.reference_selfie_url,
+      checkinAt: item.checkin_at,
+      distanceM: item.distance_m,
+      radiusM: radius,
+      outOfRange: item.distance_m > radius,
+    });
+    return card.contents; // unwrap bubble จาก message wrapper
+  });
+
+  const messages = [{
+    type: 'flex',
+    altText: 'รออนุมัติ ' + pendingList.length + ' รายการ',
+    contents: { type: 'carousel', contents: bubbles },
+  }];
+
+  if (pendingList.length > MAX_CAROUSEL) {
+    messages.push({
+      type: 'text',
+      text: 'แสดง ' + MAX_CAROUSEL + ' รายการแรก จากทั้งหมด ' + pendingList.length + ' รายการ\n' +
+            'อนุมัติ/ไม่อนุมัติของเก่าแล้วพิมพ์ "รอ" ใหม่เพื่อดูส่วนที่เหลือ',
+    });
+  }
+
+  return replyMessage(ev.replyToken, messages);
+}
+
+/**
+ * คืน list ของ pending checkins ที่ JOIN กับ Employees แล้ว
+ * sort: ใหม่สุดก่อน (checkin_at desc)
+ */
+function listPendingCheckins_() {
+  const sheetId = PropertiesService.getScriptProperties().getProperty('SHEET_ID');
+  const ss = SpreadsheetApp.openById(sheetId);
+  const checkSh = ss.getSheetByName('Checkins');
+  const empSh = ss.getSheetByName('Employees');
+
+  // build employee lookup map
+  const empMap = {};
+  const empLast = empSh.getLastRow();
+  if (empLast >= 2) {
+    const eh = empSh.getRange(1, 1, 1, empSh.getLastColumn()).getValues()[0];
+    const ed = empSh.getRange(2, 1, empLast - 1, empSh.getLastColumn()).getValues();
+    const iId = eh.indexOf('employee_id');
+    const iName = eh.indexOf('display_name');
+    const iPhone = eh.indexOf('phone');
+    const iSelfie = eh.indexOf('selfie_url');
+    ed.forEach(function (row) {
+      empMap[row[iId]] = {
+        display_name: row[iName],
+        phone: row[iPhone],
+        selfie_url: row[iSelfie],
+      };
+    });
+  }
+
+  const checkLast = checkSh.getLastRow();
+  if (checkLast < 2) return [];
+  const ch = checkSh.getRange(1, 1, 1, checkSh.getLastColumn()).getValues()[0];
+  const cd = checkSh.getRange(2, 1, checkLast - 1, checkSh.getLastColumn()).getValues();
+
+  const iCheckId = ch.indexOf('checkin_id');
+  const iEmpId = ch.indexOf('employee_id');
+  const iAt = ch.indexOf('checkin_at');
+  const iSelfie = ch.indexOf('selfie_url');
+  const iDist = ch.indexOf('distance_m');
+  const iStatus = ch.indexOf('status');
+
+  const pending = [];
+  cd.forEach(function (row) {
+    if (row[iStatus] !== 'pending') return;
+    const emp = empMap[row[iEmpId]] || {};
+    pending.push({
+      checkin_id: row[iCheckId],
+      employee_id: row[iEmpId],
+      display_name: emp.display_name || row[iEmpId],
+      phone: emp.phone || '',
+      selfie_url: row[iSelfie],
+      reference_selfie_url: emp.selfie_url || '',
+      checkin_at: row[iAt],
+      distance_m: Number(row[iDist] || 0),
+    });
+  });
+
+  pending.sort(function (a, b) {
+    return String(b.checkin_at).localeCompare(String(a.checkin_at));
+  });
+  return pending;
 }
 
 /**
