@@ -58,10 +58,14 @@ function testSendSlotReminderSlot4() {
   sendSlotReminder_(cfg, 4, todayBangkok(), 1);
 }
 
-/** ส่ง broadcast เลิกงานทันที — bypass time check */
+/** ส่ง broadcast เลิกงานทันที — bypass time check (ยังคง filter owner + สแกนแล้ว) */
 function testSendEndOfWork() {
-  sendEndOfWorkBroadcast_();
-  Logger.log('ส่ง end-of-work broadcast เรียบร้อย ดู LINE chat ของ active employees');
+  sendEndOfWorkBroadcast_(false);
+}
+
+/** ส่ง EOW หาทุก active employee — bypass ทุก filter (รวม owner + คนสแกนแล้ว) — สำหรับทดสอบ */
+function testSendEndOfWorkForceAll() {
+  sendEndOfWorkBroadcast_(true);
 }
 
 /** ทดสอบทุก slot reminder + EOW ในรอบเดียว (สำหรับ demo) */
@@ -257,18 +261,22 @@ function sendSlotReminder_(cfg, slot, today, round) {
   logInfo('sendSlotReminder', 'slot=' + slot + ' round=' + round + ' sent=' + sent, '');
 }
 
-/** broadcast เลิกงาน — push flex card สีเหลืองหา active employees ที่ยังไม่สแกน slot 4 (ยกเว้น owner) */
-function sendEndOfWorkBroadcast_() {
+/**
+ * broadcast เลิกงาน — push flex card สีเหลือง
+ * default: skip owner + คนที่สแกน slot 4 แล้ว
+ * forceAll=true → ส่งหาทุกคน active (ใช้ตอนทดสอบ)
+ */
+function sendEndOfWorkBroadcast_(forceAll) {
   const sheetId = PropertiesService.getScriptProperties().getProperty('SHEET_ID');
   const ss = SpreadsheetApp.openById(sheetId);
   const empSh = ss.getSheetByName('Employees');
   const checkSh = ss.getSheetByName('Checkins');
-  if (empSh.getLastRow() < 2) return;
+  if (empSh.getLastRow() < 2) { logInfo('sendEndOfWorkBroadcast', 'no employees', ''); return; }
   const today = todayBangkok();
 
-  // คนที่สแกน slot 4 แล้ววันนี้ — skip
+  // คนที่สแกน slot 4 แล้ววันนี้ — skip (ยกเว้น forceAll)
   const scannedSlot4 = {};
-  if (checkSh.getLastRow() >= 2) {
+  if (!forceAll && checkSh.getLastRow() >= 2) {
     const ch = checkSh.getRange(1, 1, 1, checkSh.getLastColumn()).getValues()[0];
     const cd = checkSh.getRange(2, 1, checkSh.getLastRow() - 1, checkSh.getLastColumn()).getValues();
     const iEmp = ch.indexOf('employee_id');
@@ -290,16 +298,19 @@ function sendEndOfWorkBroadcast_() {
   const iLine = eh.indexOf('line_user_id');
   const iActive = eh.indexOf('is_active');
 
-  let sent = 0;
+  let sent = 0, skipInactive = 0, skipNoUid = 0, skipOwner_ = 0, skipScanned = 0;
   ed.forEach(function (row) {
-    if (row[iActive] !== true && String(row[iActive]).toLowerCase() !== 'true') return;
+    if (row[iActive] !== true && String(row[iActive]).toLowerCase() !== 'true') { skipInactive++; return; }
     const uid = row[iLine];
-    if (!uid) return;
-    if (isOwner(uid)) return;
-    if (scannedSlot4[row[iId]]) return;  // สแกน slot 4 แล้ว = ไม่เตือนซ้ำ
+    if (!uid) { skipNoUid++; return; }
+    if (!forceAll && isOwner(uid)) { skipOwner_++; return; }
+    if (!forceAll && scannedSlot4[row[iId]]) { skipScanned++; return; }
     const card = buildEndOfWorkCard(row[iName]);
     pushMessage(uid, [card]);
     sent++;
   });
-  logInfo('sendEndOfWorkBroadcast', 'sent=' + sent, '');
+  logInfo('sendEndOfWorkBroadcast',
+    'sent=' + sent + ' inactive=' + skipInactive + ' noUid=' + skipNoUid +
+    ' owner=' + skipOwner_ + ' scannedSlot4=' + skipScanned + ' forceAll=' + (forceAll ? 1 : 0),
+    '');
 }
