@@ -110,11 +110,17 @@ function readSheetConfig_(sheetId) {
     const data = sh.getRange(2, 1, last - 1, 2).getValues();
     data.forEach(function (row) {
       const k = row[0];
-      const v = row[1];
+      let v = row[1];
       if (!k) return;
-      // แปลงเป็น number ถ้าเป็นตัวเลข
-      result[k] = (typeof v === 'number') ? v :
-                  (!isNaN(parseFloat(v)) && isFinite(v)) ? Number(v) : v;
+      // Sheets auto-convert "08:00" → Date — format กลับเป็น HH:mm string
+      if (v instanceof Date) {
+        v = Utilities.formatDate(v, 'Asia/Bangkok', 'HH:mm');
+      } else if (typeof v === 'number') {
+        // keep
+      } else if (typeof v === 'string' && !isNaN(parseFloat(v)) && isFinite(v)) {
+        v = Number(v);
+      }
+      result[k] = v;
     });
   }
 
