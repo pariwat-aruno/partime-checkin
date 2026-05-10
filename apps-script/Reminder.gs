@@ -81,6 +81,43 @@ function testSendSlotReminderSlot1Round2() {
   sendSlotReminder_(getConfig(), 1, todayBangkok(), 2);
 }
 
+// ============================================================
+// PREVIEW — ส่งการ์ดตรงหา owner ทุก case (bypass filter ทั้งหมด)
+// ใช้เฉพาะตอนทดสอบดูหน้าตา ไม่ใช่ flow จริง
+// ============================================================
+
+function previewAllCardsToOwner() {
+  const cfg = getConfig();
+  const ownerId = cfg.OWNER_LINE_USER_IDS[0];
+  if (!ownerId) { Logger.log('ไม่มี owner ใน Config'); return; }
+
+  // 4 slot reminder (round 1)
+  for (let s = 1; s <= 4; s++) {
+    const card = buildScanReminderCard('เจ้าของ (preview)', getSlotLabel(cfg, s), false);
+    pushMessage(ownerId, [card]);
+    Utilities.sleep(400);
+  }
+  // round 2 ของ slot 4 — ครั้งสุดท้าย
+  const r2 = buildScanReminderCard('เจ้าของ (preview)', getSlotLabel(cfg, 4), true);
+  pushMessage(ownerId, [r2]);
+  Utilities.sleep(400);
+
+  // EOW
+  const eow = buildEndOfWorkCard('เจ้าของ (preview)');
+  pushMessage(ownerId, [eow]);
+
+  Logger.log('preview ครบ — ส่งหา owner: 4 slot reminder + 1 round2 + 1 EOW');
+}
+
+function previewEndOfWorkToOwner() {
+  const cfg = getConfig();
+  const ownerId = cfg.OWNER_LINE_USER_IDS[0];
+  if (!ownerId) return;
+  const card = buildEndOfWorkCard('เจ้าของ (preview)');
+  pushMessage(ownerId, [card]);
+  Logger.log('preview EOW ส่งหา owner เรียบร้อย');
+}
+
 function tickReminders() {
   try {
     const cfg = getConfig();
