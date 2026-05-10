@@ -90,9 +90,18 @@ function saveReminderState_(state) {
   PropertiesService.getScriptProperties().setProperty('reminder_state', JSON.stringify(state));
 }
 
+/** force-convert input → 'HH:mm' string (รับ Date จาก Sheet ได้) */
+function toHHmm_(x) {
+  if (x == null) return '';
+  if (x instanceof Date) return Utilities.formatDate(x, 'Asia/Bangkok', 'HH:mm');
+  return String(x).trim();
+}
+
 function addMinutes_(hhmm, mins) {
-  const parts = String(hhmm).split(':');
+  const parts = toHHmm_(hhmm).split(':');
+  if (parts.length < 2) return '';
   let total = Number(parts[0]) * 60 + Number(parts[1]) + mins;
+  if (isNaN(total)) return '';
   if (total < 0) total += 24 * 60;
   if (total >= 24 * 60) total -= 24 * 60;
   return String(Math.floor(total / 60)).padStart(2, '0') + ':' +
@@ -100,8 +109,14 @@ function addMinutes_(hhmm, mins) {
 }
 
 function hhmmInWindow_(now, target, windowMin) {
-  const toMin = function (s) { const p = s.split(':'); return Number(p[0]) * 60 + Number(p[1]); };
-  return Math.abs(toMin(now) - toMin(target)) <= windowMin;
+  const toMin = function (x) {
+    const p = toHHmm_(x).split(':');
+    if (p.length < 2) return NaN;
+    return Number(p[0]) * 60 + Number(p[1]);
+  };
+  const a = toMin(now), b = toMin(target);
+  if (isNaN(a) || isNaN(b)) return false;
+  return Math.abs(a - b) <= windowMin;
 }
 
 /**
