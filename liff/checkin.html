@@ -5,32 +5,77 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>เช็คอิน — partime-checkin</title>
   <link rel="stylesheet" href="./css/style.css" />
+  <style>
+    .slot-status-grid {
+      display: grid; grid-template-columns: repeat(4, 1fr);
+      gap: 6px; margin-bottom: 14px;
+    }
+    .slot-status {
+      background: #f0f0f0; border-radius: 8px; padding: 10px 4px;
+      text-align: center; font-size: 11px;
+    }
+    .slot-status.done    { background: #e8f5e9; color: #1b5e20; }
+    .slot-status.current { background: #fff3e0; color: #e65100; outline: 2px solid #fbbc04; }
+    .slot-status .icon   { font-size: 20px; display: block; margin-bottom: 2px; }
+    .slot-status .label  { font-weight: 600; }
+
+    .current-slot-banner {
+      background: #06c755; color: #fff; padding: 12px;
+      border-radius: 8px; text-align: center; margin-bottom: 14px;
+      font-weight: 600;
+    }
+
+    #video-wrap {
+      position: relative; width: 100%; aspect-ratio: 1/1;
+      background: #000; border-radius: 12px; overflow: hidden;
+      margin-bottom: 12px;
+    }
+    #video, #captured {
+      width: 100%; height: 100%; object-fit: cover; display: block;
+    }
+    #captured { display: none; }
+    .cam-status { position: absolute; top:8px; left:8px; right:8px;
+      color:#fff; font-size:12px; text-align:center;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.6);
+    }
+  </style>
 </head>
 <body>
   <div class="card">
-    <h1>📍 เช็คอินวันนี้</h1>
-    <div class="subtitle">ต้องอยู่ในรัศมีหน้างาน + ถ่าย selfie</div>
+    <h1>📍 เช็คอิน</h1>
+    <div class="subtitle">สแกนหน้า 4 ครั้ง/วัน — บังคับถ่ายสด ห้ามเลือกรูป</div>
 
     <div id="error" class="error" style="display:none"></div>
     <div id="success" class="success-banner" style="display:none"></div>
 
-    <div class="label">ชื่อ</div>
-    <div id="name" class="name-box loading">กำลังโหลด...</div>
+    <div id="boot-loading" class="muted">กำลังโหลด...</div>
 
-    <div class="label">พิกัด GPS</div>
-    <div id="gps" class="userid-box loading">กำลังขอพิกัด...</div>
+    <div id="content" style="display:none">
+      <div class="label">ชื่อ</div>
+      <div id="name" class="name-box">—</div>
 
-    <div class="file-field">
-      <div class="label">selfie วันนี้</div>
-      <input type="file" id="selfie" accept="image/*" capture="user" />
-      <img id="selfie-preview" class="preview" style="display:none" />
-    </div>
+      <div class="label">สถานะวันนี้</div>
+      <div id="slot-grid" class="slot-status-grid"></div>
 
-    <button id="btn-submit" class="btn-primary" disabled>เช็คอิน</button>
-    <button id="btn-retry-gps" class="btn-secondary" style="display:none">ขอพิกัด GPS อีกครั้ง</button>
+      <div id="current-slot-banner" class="current-slot-banner">—</div>
 
-    <div class="note">
-      <strong>วิธี:</strong> เปิด GPS + อนุญาต location → เลือก/ถ่ายรูป selfie → กดเช็คอิน → รอเจ้าของอนุมัติ
+      <div class="label">พิกัด GPS</div>
+      <div id="gps" class="userid-box loading">กำลังขอพิกัด...</div>
+
+      <div id="video-wrap">
+        <div id="cam-status" class="cam-status">กำลังเปิดกล้อง...</div>
+        <video    id="video"    autoplay muted playsinline></video>
+        <img      id="captured" alt="captured" />
+      </div>
+
+      <button id="btn-capture" class="btn-primary" disabled>📷 ถ่ายภาพ</button>
+      <button id="btn-retake"  class="btn-secondary" style="display:none">ถ่ายใหม่</button>
+      <button id="btn-submit"  class="btn-primary"  style="display:none;margin-top:10px">ส่งเช็คอิน</button>
+
+      <div class="note">
+        <strong>วิธี:</strong> กดถ่าย → กดส่ง → รอเจ้าของอนุมัติหลังจากครบ 4 ครั้ง<br/>
+        นอกรัศมี = ส่งได้แต่ flag ให้เจ้าของพิจารณา
+      </div>
     </div>
   </div>
 
@@ -39,103 +84,189 @@
     import { CONFIG } from './js/config.js';
     import { initAuth, state } from './js/auth.js';
     import { api } from './js/api.js';
-    import { fileToResizedBase64, getGeolocation, showError, clearError } from './js/utils.js';
+    import { getGeolocation, showError, clearError } from './js/utils.js';
+    import { startCamera, captureFromVideo, stopCamera } from './js/camera.js';
 
-    const nameEl   = document.getElementById('name');
-    const gpsEl    = document.getElementById('gps');
-    const errEl    = document.getElementById('error');
-    const okEl     = document.getElementById('success');
-    const fileEl   = document.getElementById('selfie');
-    const btn      = document.getElementById('btn-submit');
-    const btnRetry = document.getElementById('btn-retry-gps');
+    const errEl   = document.getElementById('error');
+    const okEl    = document.getElementById('success');
+    const bootEl  = document.getElementById('boot-loading');
+    const contentEl = document.getElementById('content');
+    const nameEl  = document.getElementById('name');
+    const gridEl  = document.getElementById('slot-grid');
+    const bannerEl = document.getElementById('current-slot-banner');
+    const gpsEl   = document.getElementById('gps');
+    const videoEl = document.getElementById('video');
+    const capturedEl = document.getElementById('captured');
+    const camStatusEl = document.getElementById('cam-status');
+    const btnCapture = document.getElementById('btn-capture');
+    const btnRetake  = document.getElementById('btn-retake');
+    const btnSubmit  = document.getElementById('btn-submit');
 
+    let camStream = null;
     let coords = null;
+    let capturedBase64 = null;
+    let todayStatus = null;
 
     async function boot() {
       try {
         await initAuth(CONFIG.LIFF_ID_CHECKIN);
       } catch (e) {
-        showError(errEl, 'LIFF init error: ' + e.message);
+        bootEl.style.display = 'none';
+        showError(errEl, 'LIFF init: ' + e.message);
         return;
       }
-      nameEl.textContent = state.profile.displayName || '(ไม่มีชื่อ)';
-      nameEl.classList.remove('loading');
-      await fetchGps();
+      try {
+        todayStatus = await api.post('getTodayStatus', { lineUserId: state.lineUserId });
+      } catch (e) {
+        bootEl.style.display = 'none';
+        if (e.code === 'not_registered') {
+          showError(errEl, 'ยังไม่ได้ลงทะเบียน — กดเมนู "ลงทะเบียน" ก่อน');
+        } else if (e.code === 'inactive') {
+          showError(errEl, 'บัญชีถูกระงับ — ติดต่อเจ้าของ');
+        } else {
+          showError(errEl, e.message || e.code);
+        }
+        return;
+      }
+
+      nameEl.textContent = todayStatus.displayName + ' (' + todayStatus.employeeId + ')';
+      renderSlotGrid(todayStatus);
+
+      bootEl.style.display = 'none';
+      contentEl.style.display = 'block';
+
+      // ขอ GPS + เปิดกล้องคู่ขนาน
+      fetchGps();
+      openCamera();
+    }
+
+    function renderSlotGrid(status) {
+      const cur = status.currentSlot;
+      gridEl.innerHTML = status.slots.map(function (s) {
+        const cls = s.completed ? 'done' : (s.slot === cur ? 'current' : '');
+        const icon = s.completed ? '✓' : (s.slot === cur ? '⏳' : '—');
+        return '<div class="slot-status ' + cls + '">' +
+                  '<span class="icon">' + icon + '</span>' +
+                  '<span class="label">' + s.label + '</span>' +
+                '</div>';
+      }).join('');
+
+      const curSlot = status.slots.find(function(s){ return s.slot === cur; });
+      if (curSlot && curSlot.completed) {
+        bannerEl.style.background = '#888';
+        bannerEl.textContent = '"' + status.currentSlotLabel + '" สแกนไปแล้ว — รอ slot ถัดไป';
+        btnCapture.disabled = true;
+        btnCapture.textContent = 'สแกนซ้ำไม่ได้';
+      } else {
+        bannerEl.textContent = '🎯 กำลังสแกน slot ที่ ' + cur + ': "' + status.currentSlotLabel + '"';
+      }
     }
 
     async function fetchGps() {
-      gpsEl.textContent = 'กำลังขอพิกัด...';
-      gpsEl.classList.add('loading');
-      btnRetry.style.display = 'none';
       try {
         coords = await getGeolocation();
         gpsEl.textContent = coords.lat.toFixed(6) + ', ' + coords.lng.toFixed(6) + ' (±' + Math.round(coords.accuracy) + 'm)';
         gpsEl.classList.remove('loading');
         updateBtn();
       } catch (e) {
-        coords = null;
-        showError(errEl, e.message + ' — กดอนุญาต location ใน LINE setting แล้วลองใหม่');
+        showError(errEl, e.message + ' — เปิด location ใน LINE setting');
         gpsEl.textContent = '—';
         gpsEl.classList.remove('loading');
-        btnRetry.style.display = 'block';
       }
     }
 
-    btnRetry.addEventListener('click', fetchGps);
-
-    fileEl.addEventListener('change', async (e) => {
-      if (e.target.files[0]) {
-        const b64 = await fileToResizedBase64(e.target.files[0]);
-        document.getElementById('selfie-preview').src = b64;
-        document.getElementById('selfie-preview').style.display = 'block';
+    async function openCamera() {
+      try {
+        camStream = await startCamera(videoEl, 'user');
+        camStatusEl.style.display = 'none';
+        updateBtn();
+      } catch (e) {
+        camStatusEl.textContent = 'กล้องไม่พร้อม: ' + (e.message || '');
+        showError(errEl, 'กล้องไม่พร้อม — อนุญาต permission กล้องใน LINE');
       }
-      updateBtn();
+    }
+
+    btnCapture.addEventListener('click', () => {
+      try {
+        capturedBase64 = captureFromVideo(videoEl);
+        capturedEl.src = capturedBase64;
+        videoEl.style.display = 'none';
+        capturedEl.style.display = 'block';
+        btnCapture.style.display = 'none';
+        btnRetake.style.display = 'block';
+        btnSubmit.style.display = 'block';
+      } catch (e) {
+        showError(errEl, e.message);
+      }
     });
 
-    function updateBtn() {
-      btn.disabled = !(coords && fileEl.files[0]);
-    }
+    btnRetake.addEventListener('click', () => {
+      capturedBase64 = null;
+      capturedEl.src = '';
+      capturedEl.style.display = 'none';
+      videoEl.style.display = 'block';
+      btnRetake.style.display = 'none';
+      btnSubmit.style.display = 'none';
+      btnCapture.style.display = 'block';
+    });
 
-    btn.addEventListener('click', async () => {
+    btnSubmit.addEventListener('click', async () => {
       clearError(errEl);
-      btn.disabled = true;
-      btn.textContent = 'กำลังส่ง...';
+      if (!coords) { showError(errEl, 'ยังไม่มี GPS'); return; }
+      if (!capturedBase64) { showError(errEl, 'ยังไม่ได้ถ่ายรูป'); return; }
+      btnSubmit.disabled = true;
+      btnSubmit.textContent = 'กำลังส่ง...';
       try {
-        const selfieBase64 = await fileToResizedBase64(fileEl.files[0]);
         const result = await api.post('checkin', {
           lineUserId:   state.lineUserId,
           lat:          coords.lat,
           lng:          coords.lng,
-          selfieBase64: selfieBase64,
+          selfieBase64: capturedBase64,
+          slot:         todayStatus.currentSlot,
         });
+
+        // ปิดกล้อง
+        stopCamera(camStream); camStream = null;
+
         okEl.style.display = 'block';
-        if (result.duplicated) {
-          okEl.textContent = '⏰ วันนี้เช็คอินไปแล้ว (' + result.checkinId + ')';
-        } else if (result.outOfRange) {
+        let msg = '';
+        if (result.alreadyScanned) {
+          msg = '⏰ slot นี้สแกนไปแล้ว';
+        } else if (result.completed) {
+          msg = '✅ สแกนครบ 4/4 — ส่ง flex card หาเจ้าของแล้ว';
+        } else {
+          msg = '✓ slot ' + result.slot + ' (' + result.slotLabel + ') บันทึกแล้ว — สแกน ' +
+                result.scanCount + '/4';
+        }
+        if (result.outOfRange) {
           okEl.style.background = '#fff3e0';
           okEl.style.borderLeftColor = '#e65100';
           okEl.style.color = '#e65100';
-          okEl.innerHTML = '⚠️ <strong>เช็คอินนอกพื้นที่</strong> (ห่าง ' + result.distanceM + ' m)<br/>' +
-            'ส่งคำขอแล้ว — เจ้าของจะเห็น flag "นอกรัศมี" ใน flex card<br/>' +
-            'ถ้าเจ้าของไม่อนุมัติ = ไม่ได้ค่าจ้างวันนั้น';
-        } else {
-          okEl.textContent = '✅ เช็คอินสำเร็จ — รออนุมัติจากเจ้าของ (' + result.checkinId + ')';
+          msg += '\n⚠️ นอกรัศมี ' + result.distanceM + ' m — flag ส่งให้เจ้าของพิจารณา';
         }
-        btn.textContent = 'ส่งสำเร็จ';
+        okEl.style.whiteSpace = 'pre-line';
+        okEl.textContent = msg;
+
+        // ซ่อนปุ่มหลังส่ง
+        btnSubmit.style.display = 'none';
+        btnRetake.style.display = 'none';
+        bannerEl.style.display = 'none';
       } catch (e) {
-        if (e.code === 'not_registered') {
-          showError(errEl, 'ยังไม่ได้ลงทะเบียน — กดเมนู "ลงทะเบียน" ก่อน');
-        } else if (e.code === 'inactive') {
-          showError(errEl, 'บัญชีถูกระงับ — ติดต่อเจ้าของ');
-        } else if (e.code === 'upload_failed') {
-          showError(errEl, 'อัพรูปไม่สำเร็จ: ' + (e.data.detail || ''));
-        } else {
-          showError(errEl, 'ผิดพลาด: ' + (e.message || e.code));
-        }
-        btn.disabled = false;
-        btn.textContent = 'เช็คอิน';
+        showError(errEl, 'ผิดพลาด: ' + (e.message || e.code));
+        btnSubmit.disabled = false;
+        btnSubmit.textContent = 'ส่งเช็คอิน';
       }
     });
+
+    function updateBtn() {
+      const ready = coords && camStream;
+      // ถ้า slot ปัจจุบันสแกนไปแล้ว — ปุ่มยังถูก disable จาก renderSlotGrid
+      const slotDone = todayStatus && todayStatus.slots.find(function(s){ return s.slot === todayStatus.currentSlot && s.completed; });
+      btnCapture.disabled = !ready || !!slotDone;
+    }
+
+    // cleanup กล้องเมื่อปิดหน้า
+    window.addEventListener('pagehide', () => stopCamera(camStream));
 
     boot();
   </script>

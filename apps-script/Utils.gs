@@ -107,6 +107,24 @@ function padLeft_(n, width) {
   return s;
 }
 
+/**
+ * คำนวณ slot ปัจจุบัน (1-4) จากเวลา Asia/Bangkok + Sheet Config
+ * < slot1_until → 1, < slot2_until → 2, < slot3_until → 3, อื่น ๆ → 4
+ */
+function getCurrentSlot(cfg) {
+  const now = Utilities.formatDate(new Date(), 'Asia/Bangkok', 'HH:mm');
+  if (now < (cfg.slot1_until || '11:00')) return 1;
+  if (now < (cfg.slot2_until || '13:00')) return 2;
+  if (now < (cfg.slot3_until || '17:00')) return 3;
+  return 4;
+}
+
+/** label ของ slot — เอามาจาก Sheet Config (slot1_label / slot2_label / ...) */
+function getSlotLabel(cfg, slot) {
+  const fallback = ['', 'เช้า', 'ก่อนพักเที่ยง', 'บ่ายโมง', 'เลิกงาน'];
+  return cfg['slot' + slot + '_label'] || fallback[slot] || ('slot ' + slot);
+}
+
 /** หา employee จาก line_user_id — return row object หรือ null */
 function findEmployeeByLineUserId(lineUserId) {
   const sheetId = PropertiesService.getScriptProperties().getProperty('SHEET_ID');

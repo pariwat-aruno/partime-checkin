@@ -1,12 +1,13 @@
 /**
- * Balance.gs — flow D handler (TASK-17)
+ * Balance.gs — flow D handler — รองรับ 4-slot
  *
  * input: { lineUserId }
  * output: {
  *   ok: true,
- *   currentMonth: { full, half, total },
- *   pendingDays,
- *   lastPayment: { period, total, status } | null
+ *   currentMonth: { full, half, total },     // เฉพาะวันที่ approved
+ *   incompleteApproved,                       // วันที่ approved แต่สแกนไม่ครบ 4
+ *   pendingDays,                              // status=pending ทั้งหมด (รวมไม่ครบ)
+ *   lastPayment: { period, total, status }
  * }
  */
 
@@ -14,28 +15,23 @@ function getBalance(payload) {
   if (!payload || !payload.lineUserId) {
     return { ok: false, error: 'missing_fields' };
   }
-
   const emp = findEmployeeByLineUserId(payload.lineUserId);
   if (!emp) return { ok: false, error: 'not_registered' };
 
   const sheetId = PropertiesService.getScriptProperties().getProperty('SHEET_ID');
   const ss = SpreadsheetApp.openById(sheetId);
-
-  // เดือนนี้
   const month = thisMonthBangkok();
+
   const stats = sumCheckinsForMonth_(ss, emp.employee_id, month);
-
-  // pending รวมทุกเดือน (ค้างยังไม่อนุมัติ)
   const pending = countPendingCheckins_(ss, emp.employee_id);
-
-  // รอบจ่ายล่าสุด
   const lastPayment = findLastPayment_(ss, emp.employee_id);
 
   return {
     ok: true,
     employeeId: emp.employee_id,
     displayName: emp.display_name,
-    currentMonth: stats,
+    currentMonth: { full: stats.full, half: stats.half, total: stats.total },
+    incompleteApproved: stats.incompleteApproved,
     pendingDays: pending,
     lastPayment: lastPayment,
   };
@@ -44,7 +40,7 @@ function getBalance(payload) {
 function sumCheckinsForMonth_(ss, employeeId, monthStr) {
   const sh = ss.getSheetByName('Checkins');
   const last = sh.getLastRow();
-  if (last < 2) return { full: 0, half: 0, total: 0 };
+  if (last < 2) return { full: 0, half: 0, total: 0, incompleteApproved: 0 };
   const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
   const data = sh.getRange(2, 1, last - 1, sh.getLastColumn()).getValues();
   const iEmp = headers.indexOf('employee_id');
@@ -52,8 +48,9 @@ function sumCheckinsForMonth_(ss, employeeId, monthStr) {
   const iStatus = headers.indexOf('status');
   const iDayType = headers.indexOf('day_type');
   const iWage = headers.indexOf('wage');
+  const iScan = headers.indexOf('scan_count');
 
-  let full = 0, half = 0, total = 0;
+  let full = 0, half = 0, total = 0, incompleteApproved = 0;
   data.forEach(function (row) {
     if (row[iEmp] !== employeeId) return;
     if (row[iStatus] !== 'approved') return;
@@ -65,8 +62,9 @@ function sumCheckinsForMonth_(ss, employeeId, monthStr) {
     if (row[iDayType] === 'full') full++;
     if (row[iDayType] === 'half') half++;
     total += Number(row[iWage] || 0);
+    if (Number(row[iScan] || 0) < 4) incompleteApproved++;
   });
-  return { full: full, half: half, total: total };
+  return { full: full, half: half, total: total, incompleteApproved: incompleteApproved };
 }
 
 function countPendingCheckins_(ss, employeeId) {

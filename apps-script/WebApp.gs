@@ -50,10 +50,12 @@ function doPost(e) {
 /** route LIFF action → handler */
 function routeAction_(action, payload) {
   switch (action) {
-    case 'register':     return register(payload);
-    case 'checkin':      return checkin(payload);
-    case 'getBalance':   return getBalance(payload);
-    case 'closePeriod':  return closePeriod(payload);
+    case 'register':       return register(payload);
+    case 'checkin':        return checkin(payload);
+    case 'getBalance':     return getBalance(payload);
+    case 'getTodayStatus': return getTodayStatus(payload);
+    case 'getDailyReport': return getDailyReport(payload);
+    case 'closePeriod':    return closePeriod(payload);
     default:
       return { ok: false, error: 'unknown_action', action: action };
   }
@@ -102,9 +104,16 @@ function handleMessageEvent_(ev) {
     return replyPendingApprovals_(ev);
   }
 
+  // "รายงาน" หรือ "รายงาน 2026-05-10"
+  const reportMatch = text.match(/^รายงาน\s*(\d{4}-\d{2}-\d{2})?$/);
+  if (reportMatch) {
+    return replyDailyReport_(ev, reportMatch[1] || null);
+  }
+
   return replyText(ev.replyToken,
     'พิมพ์ "id" รับ LINE User ID\n' +
-    'พิมพ์ "รอ" ดูรายการรออนุมัติ (เฉพาะเจ้าของ)\n' +
+    'พิมพ์ "รอ" ดูรายการรออนุมัติ (เจ้าของ)\n' +
+    'พิมพ์ "รายงาน" หรือ "รายงาน 2026-05-10" ดูสรุปวัน (เจ้าของ)\n' +
     'หรือใช้เมนูด้านล่าง: ลงทะเบียน / เช็คอิน / ดูยอด');
 }
 
@@ -134,14 +143,15 @@ function replyPendingApprovals_(ev) {
       checkinId: item.checkin_id,
       displayName: item.display_name,
       phone: item.phone,
-      selfieUrl: item.selfie_url,
+      date: item.date,
+      slots: item.slots,
       referenceSelfieUrl: item.reference_selfie_url,
-      checkinAt: item.checkin_at,
-      distanceM: item.distance_m,
+      lastDistanceM: item.last_distance_m,
       radiusM: radius,
-      outOfRange: item.distance_m > radius,
+      hasOutOfRange: item.has_out_of_range,
+      scanCount: item.scan_count,
     });
-    return card.contents; // unwrap bubble จาก message wrapper
+    return card.contents; // unwrap bubble
   });
 
   const messages = [{
@@ -162,14 +172,15 @@ function replyPendingApprovals_(ev) {
 }
 
 /**
- * คืน list ของ pending checkins ที่ JOIN กับ Employees แล้ว
- * sort: ใหม่สุดก่อน (checkin_at desc)
+ * คืน list ของ pending checkins (4-slot version) ที่ JOIN กับ Employees แล้ว
+ * sort: ใหม่สุดก่อน (checkin_date desc)
  */
 function listPendingCheckins_() {
   const sheetId = PropertiesService.getScriptProperties().getProperty('SHEET_ID');
   const ss = SpreadsheetApp.openById(sheetId);
   const checkSh = ss.getSheetByName('Checkins');
   const empSh = ss.getSheetByName('Employees');
+  const cfg = getConfig();
 
   // build employee lookup map
   const empMap = {};
@@ -197,29 +208,46 @@ function listPendingCheckins_() {
 
   const iCheckId = ch.indexOf('checkin_id');
   const iEmpId = ch.indexOf('employee_id');
-  const iAt = ch.indexOf('checkin_at');
-  const iSelfie = ch.indexOf('selfie_url');
-  const iDist = ch.indexOf('distance_m');
+  const iDate = ch.indexOf('checkin_date');
+  const iLastDist = ch.indexOf('last_distance_m');
+  const iScan = ch.indexOf('scan_count');
+  const iOOR = ch.indexOf('has_out_of_range');
   const iStatus = ch.indexOf('status');
+  const slotCols = [1, 2, 3, 4].map(function (s) {
+    return { at: ch.indexOf('slot' + s + '_at'), url: ch.indexOf('slot' + s + '_url') };
+  });
 
   const pending = [];
   cd.forEach(function (row) {
     if (row[iStatus] !== 'pending') return;
     const emp = empMap[row[iEmpId]] || {};
+    const slots = slotCols.map(function (sc, i) {
+      const at = row[sc.at];
+      const url = row[sc.url];
+      return {
+        slot: i + 1,
+        label: getSlotLabel(cfg, i + 1),
+        at: at || '',
+        url: url || '',
+        completed: !!at,
+      };
+    });
     pending.push({
       checkin_id: row[iCheckId],
       employee_id: row[iEmpId],
       display_name: emp.display_name || row[iEmpId],
       phone: emp.phone || '',
-      selfie_url: row[iSelfie],
       reference_selfie_url: emp.selfie_url || '',
-      checkin_at: row[iAt],
-      distance_m: Number(row[iDist] || 0),
+      date: row[iDate],
+      last_distance_m: Number(row[iLastDist] || 0),
+      has_out_of_range: row[iOOR] === true,
+      scan_count: Number(row[iScan] || 0),
+      slots: slots,
     });
   });
 
   pending.sort(function (a, b) {
-    return String(b.checkin_at).localeCompare(String(a.checkin_at));
+    return String(b.date).localeCompare(String(a.date));
   });
   return pending;
 }

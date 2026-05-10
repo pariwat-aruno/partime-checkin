@@ -33,11 +33,19 @@ const SHEET_HEADERS = {
     'checkin_id',
     'employee_id',
     'checkin_date',
-    'checkin_at',
-    'lat',
-    'lng',
-    'distance_m',
-    'selfie_url',
+    'slot1_at',         // เช้า
+    'slot1_url',
+    'slot2_at',         // ก่อนพักเที่ยง
+    'slot2_url',
+    'slot3_at',         // บ่ายโมง
+    'slot3_url',
+    'slot4_at',         // เลิกงาน
+    'slot4_url',
+    'last_lat',
+    'last_lng',
+    'last_distance_m',
+    'has_out_of_range',
+    'scan_count',
     'status',
     'day_type',
     'wage',
@@ -145,7 +153,7 @@ function ensureSheetWithHeaders_(ss, name, headers) {
 // TASK-02 — seed ค่าเริ่มต้นใน sheet Config
 // ========================================================================
 
-// ค่า default ของระบบ — แก้ตรงนี้ถ้าจะเปลี่ยนค่าจ้าง/พิกัด/รัศมี/owners
+// ค่า default ของระบบ — แก้ตรงนี้ถ้าจะเปลี่ยนค่าจ้าง/พิกัด/รัศมี/owners/slot
 const CONFIG_DEFAULTS = {
   wage_full_day: 400,
   wage_half_day: 200,
@@ -154,6 +162,15 @@ const CONFIG_DEFAULTS = {
   geofence_radius_m: 100,
   // owner_line_user_ids: comma-separated เช่น 'U1234,U5678' (เพิ่ม owner ใหม่ที่นี่)
   owner_line_user_ids: 'U4b33c5ea9673d07f3e275efaa4db02a2',
+  // ช่วงเวลา 4 slot — auto-detect จากเวลาปัจจุบัน (HH:mm)
+  // < slot1_until → slot 1, < slot2_until → slot 2, ฯลฯ, สูงกว่า slot3_until = slot 4
+  slot1_until: '11:00',
+  slot2_until: '13:00',
+  slot3_until: '17:00',
+  slot1_label: 'เช้า',
+  slot2_label: 'ก่อนพักเที่ยง',
+  slot3_label: 'บ่ายโมง',
+  slot4_label: 'เลิกงาน',
 };
 
 /**
@@ -207,6 +224,39 @@ function findSheetId_() {
     throw new Error('ไม่เจอไฟล์ "' + DB_NAME + '" ใน Drive — รัน setupDatabase ก่อน');
   }
   return files.next().getId();
+}
+
+// ========================================================================
+// migration — Checkins v1 (one row per checkin) → v2 (4-slot per day)
+// ========================================================================
+
+/**
+ * Migrate Checkins schema:
+ *   - rename existing Checkins → Checkins_v1_archive_<timestamp>
+ *   - create new Checkins with 4-slot headers
+ *
+ * idempotent: รันซ้ำได้ — ถ้า Checkins มี header v2 อยู่แล้วจะไม่ทำอะไร
+ */
+function migrateToFourSlots() {
+  const sheetId = PropertiesService.getScriptProperties().getProperty('SHEET_ID');
+  if (!sheetId) throw new Error('SHEET_ID not set');
+  const ss = SpreadsheetApp.openById(sheetId);
+
+  const cur = ss.getSheetByName('Checkins');
+  if (cur) {
+    const headers = cur.getRange(1, 1, 1, cur.getLastColumn()).getValues()[0];
+    if (headers.indexOf('slot1_at') >= 0) {
+      Logger.log('Checkins schema = v2 อยู่แล้ว — ข้าม');
+      return;
+    }
+    const archiveName = 'Checkins_v1_archive_' +
+      Utilities.formatDate(new Date(), 'Asia/Bangkok', 'yyyyMMdd-HHmmss');
+    cur.setName(archiveName);
+    Logger.log('archived old Checkins → ' + archiveName);
+  }
+
+  ensureSheetWithHeaders_(ss, 'Checkins', SHEET_HEADERS.Checkins);
+  Logger.log('สร้าง Checkins v2 (4-slot) เรียบร้อย — ' + SHEET_HEADERS.Checkins.length + ' columns');
 }
 
 // ========================================================================
