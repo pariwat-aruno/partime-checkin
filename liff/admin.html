@@ -39,6 +39,60 @@
     .emp-stats .item .label { color: #888; }
     .emp-stats .item.pending .num { color: #e65100; }
     .emp-stats .item.total   .num { color: #1565c0; }
+    .emp-stats .item.clickable { cursor: pointer; outline: 2px solid #fbbc04; }
+    .emp-stats .item.clickable:active { background: #ffe0b2; }
+
+    /* Pending detail modal */
+    #pending-modal {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.85);
+      z-index: 9999; padding: 16px; overflow-y: auto;
+    }
+    #pending-modal .inner {
+      max-width: 480px; margin: 0 auto; background: #fff;
+      border-radius: 14px; padding: 16px;
+    }
+    #pending-modal h2 {
+      font-size: 17px; margin: 0 0 12px;
+    }
+    #pending-modal .close-btn {
+      width: 100%; padding: 10px; background: #888; color: #fff;
+      border: none; border-radius: 8px; font-weight: 600;
+      margin-top: 8px;
+    }
+    .pending-item {
+      border: 1px solid #ddd; border-radius: 10px;
+      padding: 12px; margin-bottom: 10px;
+    }
+    .pending-item .head {
+      font-weight: 600; margin-bottom: 8px; font-size: 14px;
+    }
+    .pending-item .badge {
+      display: inline-block; padding: 2px 8px; border-radius: 10px;
+      font-size: 11px; font-weight: 600; margin-left: 6px;
+    }
+    .badge.warn { background: #fff3e0; color: #e65100; }
+    .badge.danger { background: #fde8e8; color: #b71c1c; }
+    .pending-slots {
+      display: grid; grid-template-columns: repeat(4, 1fr);
+      gap: 4px; margin-bottom: 10px;
+    }
+    .pending-slots .s {
+      aspect-ratio: 1/1; background: #f0f0f0; border-radius: 6px;
+      overflow: hidden; position: relative;
+    }
+    .pending-slots .s img { width:100%; height:100%; object-fit:cover; }
+    .pending-slots .s .empty { display:flex; align-items:center; justify-content:center;
+      width:100%; height:100%; color:#aaa; font-size:10px; text-align:center; }
+    .pending-slots .s .lbl {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      background: rgba(0,0,0,0.6); color: #fff; font-size: 9px;
+      padding: 2px; text-align: center;
+    }
+    .pending-actions { display: flex; gap: 6px; margin-bottom: 4px; }
+    .pending-actions button { flex: 1; padding: 10px; font-size: 13px; }
+    .pending-actions .reject { background: #e53935; color: #fff; }
+    .pending-actions .half   { background: #fbbc04; color: #fff; }
+    .pending-actions .full   { background: #06c755; color: #fff; }
 
     .emp-actions { display: flex; gap: 6px; }
     .emp-actions button { flex: 1; padding: 10px; font-size: 14px; }
@@ -68,6 +122,15 @@
         <button id="btn-refresh" class="btn-primary">โหลด</button>
       </div>
       <div id="emp-list"></div>
+    </div>
+  </div>
+
+  <!-- Pending detail modal -->
+  <div id="pending-modal" hidden>
+    <div class="inner">
+      <h2 id="pending-title">รออนุมัติ</h2>
+      <div id="pending-body"></div>
+      <button class="close-btn" id="pending-close">ปิด</button>
     </div>
   </div>
 
@@ -172,14 +235,18 @@
           '<div class="emp-stats">' +
             '<div class="item"><div class="num">' + e.approved_full + '</div><div class="label">เต็มวัน</div></div>' +
             '<div class="item"><div class="num">' + e.approved_half + '</div><div class="label">ครึ่งวัน</div></div>' +
-            '<div class="item pending"><div class="num">' + e.pending + '</div><div class="label">รออนุมัติ</div></div>' +
+            '<div class="item pending' + (e.pending > 0 ? ' clickable' : '') + '"' +
+              (e.pending > 0 ? ' data-pending-emp="' + e.employee_id + '"' : '') + '>' +
+              '<div class="num">' + e.pending + '</div>' +
+              '<div class="label">' + (e.pending > 0 ? 'รออนุมัติ ▸' : 'รออนุมัติ') + '</div>' +
+            '</div>' +
             '<div class="item total"><div class="num">' + total + '</div><div class="label">รวม ฿</div></div>' +
           '</div>' +
           '<div class="emp-actions">' + actions + '</div>' +
         '</div>';
       }).join('');
 
-      // wire buttons
+      // wire action buttons
       listEl.querySelectorAll('button[data-action]').forEach(function (btn) {
         btn.addEventListener('click', function () {
           const a = btn.dataset.action;
@@ -188,6 +255,93 @@
           if (a === 'paid')         return doMarkPaid(btn.dataset.pid);
         });
       });
+      // wire pending click
+      listEl.querySelectorAll('[data-pending-emp]').forEach(function (el) {
+        el.addEventListener('click', function () { openPending(el.dataset.pendingEmp); });
+      });
+    }
+
+    // ===== Pending detail modal =====
+    const pmodal = document.getElementById('pending-modal');
+    const ptitle = document.getElementById('pending-title');
+    const pbody  = document.getElementById('pending-body');
+    document.getElementById('pending-close').addEventListener('click', function () {
+      pmodal.hidden = true;
+    });
+
+    async function openPending(employeeId) {
+      pmodal.hidden = false;
+      ptitle.textContent = 'รออนุมัติ — ' + employeeId;
+      pbody.innerHTML = '<div class="muted">กำลังโหลด...</div>';
+      try {
+        const r = await api.post('getPendingForEmployee', {
+          lineUserId: state.lineUserId,
+          employeeId: employeeId,
+        });
+        ptitle.textContent = 'รออนุมัติ — ' + r.displayName + ' (' + r.employeeId + ')';
+        renderPendingItems(r.items);
+      } catch (e) {
+        pbody.innerHTML = '<div class="error">ผิดพลาด: ' + (e.message || e.code) + '</div>';
+      }
+    }
+
+    function renderPendingItems(items) {
+      if (!items || items.length === 0) {
+        pbody.innerHTML = '<div class="muted">ไม่มีรายการรออนุมัติ</div>';
+        return;
+      }
+      pbody.innerHTML = items.map(function (it) {
+        const slotsHtml = it.slots.map(function (s) {
+          if (s.completed) {
+            return '<div class="s"><img src="' + escape_(s.thumb) + '" alt=""/>' +
+                   '<div class="lbl">' + escape_(s.label) + '</div></div>';
+          }
+          return '<div class="s"><div class="empty">' + escape_(s.label) + '<br/>—</div></div>';
+        }).join('');
+        const incomplete = it.scan_count < 4;
+        const badges = [];
+        if (incomplete) badges.push('<span class="badge warn">สแกน ' + it.scan_count + '/4</span>');
+        if (it.has_out_of_range) badges.push('<span class="badge danger">นอกรัศมี</span>');
+
+        return '<div class="pending-item" data-id="' + escape_(it.checkin_id) + '">' +
+          '<div class="head">📅 ' + escape_(it.date) + ' ' + badges.join('') + '</div>' +
+          '<div class="pending-slots">' + slotsHtml + '</div>' +
+          '<div class="pending-actions">' +
+            '<button class="full"   data-act="approve" data-type="full">เต็ม 400</button>' +
+            '<button class="half"   data-act="approve" data-type="half">ครึ่ง 200</button>' +
+            '<button class="reject" data-act="reject">ไม่อนุมัติ</button>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+
+      pbody.querySelectorAll('.pending-item').forEach(function (item) {
+        const id = item.dataset.id;
+        item.querySelectorAll('button[data-act]').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            doApprove(id, btn.dataset.act, btn.dataset.type);
+          });
+        });
+      });
+    }
+
+    async function doApprove(checkinId, action, type) {
+      const labelMap = { full: 'เต็มวัน 400', half: 'ครึ่งวัน 200' };
+      const what = action === 'reject' ? 'ไม่อนุมัติ' : ('อนุมัติ ' + (labelMap[type] || ''));
+      if (!window.confirm('ยืนยัน ' + what + ' สำหรับ ' + checkinId + ' ?')) return;
+      try {
+        await api.post('approveCheckin', {
+          lineUserId: state.lineUserId,
+          checkinId:  checkinId,
+          action:     action,
+          type:       type,
+        });
+        // refresh ทั้ง modal + dashboard
+        const m = ptitle.textContent.match(/\((EMP-\d+)\)/);
+        if (m) await openPending(m[1]);
+        await load();
+      } catch (e) {
+        alert('ผิดพลาด: ' + (e.message || e.code));
+      }
     }
 
     async function doClose(employeeId, confirm) {

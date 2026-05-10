@@ -150,3 +150,97 @@ function formatBangkokDateTime__(d) {
   const dt = (d instanceof Date) ? d : new Date(d);
   return Utilities.formatDate(dt, 'Asia/Bangkok', 'd MMM yyyy HH:mm');
 }
+
+/**
+ * list pending checkins ของพาร์ทไทม์คนเดียว
+ * input: { lineUserId, employeeId }
+ * output: { ok, employeeId, displayName, items: [{checkin_id, date, scan_count, slots, last_distance_m, has_out_of_range}] }
+ */
+function getPendingForEmployee(payload) {
+  if (!isOwner(payload && payload.lineUserId)) return { ok: false, error: 'not_owner' };
+  if (!payload.employeeId) return { ok: false, error: 'missing_employeeId' };
+
+  const sheetId = PropertiesService.getScriptProperties().getProperty('SHEET_ID');
+  const ss = SpreadsheetApp.openById(sheetId);
+  const sh = ss.getSheetByName('Checkins');
+  const cfg = getConfig();
+  const last = sh.getLastRow();
+  if (last < 2) return { ok: true, employeeId: payload.employeeId, items: [] };
+
+  const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+  const data = sh.getRange(2, 1, last - 1, sh.getLastColumn()).getValues();
+  const iId = headers.indexOf('checkin_id');
+  const iEmp = headers.indexOf('employee_id');
+  const iDate = headers.indexOf('checkin_date');
+  const iStatus = headers.indexOf('status');
+  const iLastDist = headers.indexOf('last_distance_m');
+  const iOOR = headers.indexOf('has_out_of_range');
+  const iScan = headers.indexOf('scan_count');
+  const slotIdx = [1, 2, 3, 4].map(function (s) {
+    return { at: headers.indexOf('slot' + s + '_at'), url: headers.indexOf('slot' + s + '_url') };
+  });
+
+  const items = [];
+  data.forEach(function (row) {
+    if (row[iEmp] !== payload.employeeId) return;
+    if (row[iStatus] !== 'pending') return;
+    const slots = slotIdx.map(function (sc, i) {
+      const at = row[sc.at];
+      const url = row[sc.url];
+      return {
+        slot: i + 1,
+        label: getSlotLabel(cfg, i + 1),
+        at: at ? formatBangkokDateTime__(at) : '',
+        url: url || '',
+        thumb: url ? driveThumbnail__(url) : '',
+        completed: !!at,
+      };
+    });
+    items.push({
+      checkin_id: row[iId],
+      date: (row[iDate] instanceof Date)
+        ? Utilities.formatDate(row[iDate], 'Asia/Bangkok', 'yyyy-MM-dd')
+        : String(row[iDate]),
+      scan_count: Number(row[iScan] || 0),
+      last_distance_m: Number(row[iLastDist] || 0),
+      has_out_of_range: row[iOOR] === true,
+      slots: slots,
+    });
+  });
+
+  // sort เก่าก่อน (ปิดยอดได้ง่าย)
+  items.sort(function (a, b) { return String(a.date).localeCompare(String(b.date)); });
+
+  // หา displayName
+  const empSh = ss.getSheetByName('Employees');
+  const eh = empSh.getRange(1, 1, 1, empSh.getLastColumn()).getValues()[0];
+  const ed = empSh.getRange(2, 1, empSh.getLastRow() - 1, empSh.getLastColumn()).getValues();
+  const iE = eh.indexOf('employee_id');
+  const iN = eh.indexOf('display_name');
+  let name = payload.employeeId;
+  for (let i = 0; i < ed.length; i++) {
+    if (ed[i][iE] === payload.employeeId) { name = ed[i][iN]; break; }
+  }
+
+  return { ok: true, employeeId: payload.employeeId, displayName: name, items: items };
+}
+
+/**
+ * อนุมัติ/ปฏิเสธ checkin จาก Owner LIFF (เทียบเท่ากับการกด postback บน flex card)
+ * input: { lineUserId, checkinId, action, type? }
+ *   action: 'approve' | 'reject'
+ *   type:   'full' | 'half' (เฉพาะตอน approve)
+ */
+function approveCheckin(payload) {
+  if (!isOwner(payload && payload.lineUserId)) return { ok: false, error: 'not_owner' };
+  if (!payload.checkinId || !payload.action) return { ok: false, error: 'missing_fields' };
+  // updateCheckinStatus_ อยู่ใน WebApp.gs (shared namespace)
+  return updateCheckinStatus_(payload.checkinId, payload.action, payload.type);
+}
+
+function driveThumbnail__(url) {
+  if (!url) return '';
+  const m = String(url).match(/\/file\/d\/([^\/\?]+)/);
+  if (!m) return url;
+  return 'https://drive.google.com/thumbnail?id=' + m[1] + '&sz=w400';
+}
