@@ -62,8 +62,9 @@ function register(payload) {
 
   // welcome message หาผู้ลงทะเบียน
   pushText(payload.lineUserId,
-    'ยินดีต้อนรับ ' + payload.displayName + ' (' + employeeId + ')\n\n' +
-    'ลงทะเบียนเรียบร้อย — กดเมนู "เช็คอิน" ตอนถึงร้านได้เลย');
+    'ยินดีต้อนรับสู่ บริษัท วอร์ด้า กินแคร์\n' +
+    payload.displayName + ' (' + employeeId + ')\n\n' +
+    'ลงทะเบียนเรียบร้อย กดเมนู "เช็คอิน" ตอนถึงร้านได้เลย');
 
   // push card หา owner ทุกคน — แจ้งว่ามีพาร์ทไทม์ใหม่
   try {

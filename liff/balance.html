@@ -3,13 +3,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>ดูยอด — partime-checkin</title>
+  <title>ดูยอด — บริษัท วอร์ด้า กินแคร์</title>
   <link rel="stylesheet" href="./css/style.css" />
 </head>
 <body>
   <div class="card">
-    <h1>💰 ยอดของคุณ</h1>
-    <div class="subtitle">ค่าจ้างเดือนนี้ + รอบที่แล้ว</div>
+    <div class="brand">บริษัท วอร์ด้า กินแคร์</div>
+    <h1>ยอดของคุณ</h1>
+    <div class="subtitle">ค่าจ้างเดือนนี้และรอบจ่ายล่าสุด</div>
 
     <div id="error" class="error" style="display:none"></div>
     <div id="loading" class="muted">กำลังโหลด...</div>
@@ -18,12 +19,12 @@
       <div class="label">เดือนนี้</div>
       <div class="balance-total">
         <div class="amount" id="month-total">—</div>
-        <div class="label" id="month-label">บาท</div>
+        <div class="label">บาท</div>
       </div>
       <div class="balance-grid">
         <div class="balance-item">
           <div class="num" id="month-full">0</div>
-          <div class="label">วันเต็ม (400)</div>
+          <div class="label">เต็มวัน (400)</div>
         </div>
         <div class="balance-item">
           <div class="num" id="month-half">0</div>
@@ -31,9 +32,9 @@
         </div>
       </div>
 
-      <div id="pending-row" style="display:none" class="note" id="pending-note"></div>
+      <div id="pending-row" style="display:none" class="note"></div>
 
-      <h3 style="margin-top:24px;font-size:16px;color:#444;">รอบที่แล้ว</h3>
+      <h3 style="margin-top:24px;font-size:15px;color:var(--text);font-weight:700;">รอบจ่ายล่าสุด</h3>
       <div id="last-payment-empty" class="muted" style="font-size:14px;padding:12px 0">
         ยังไม่มีรอบจ่าย
       </div>
@@ -46,6 +47,8 @@
       </div>
     </div>
   </div>
+
+  <div class="page-footer">บริษัท วอร์ด้า กินแคร์</div>
 
   <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <script type="module">
@@ -70,7 +73,7 @@
         if (result.pendingDays > 0) {
           const pn = document.getElementById('pending-row');
           pn.style.display = 'block';
-          pn.textContent = '⏳ รออนุมัติ ' + result.pendingDays + ' วัน (ยังไม่นับในยอด)';
+          pn.textContent = 'รออนุมัติ ' + result.pendingDays + ' วัน (ยังไม่นับในยอด)';
         }
 
         if (result.lastPayment) {
@@ -88,13 +91,12 @@
       } catch (e) {
         loadingEl.style.display = 'none';
         if (e.code === 'not_registered') {
-          showError(errEl, 'ยังไม่ได้ลงทะเบียน — กดเมนู "ลงทะเบียน" ก่อน');
+          showError(errEl, 'ยังไม่ได้ลงทะเบียน กดเมนู "ลงทะเบียน" ก่อน');
         } else {
           showError(errEl, 'ผิดพลาด: ' + (e.message || e.code));
         }
       }
     }
-
     boot();
   </script>
 </body>

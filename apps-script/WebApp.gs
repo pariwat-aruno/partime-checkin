@@ -79,9 +79,8 @@ function handleLineEvent_(ev) {
   }
 
   if (ev.type === 'follow') {
-    // user เพิ่ม bot เป็นเพื่อน → ส่งข้อความ welcome
     return replyText(ev.replyToken,
-      'ยินดีต้อนรับสู่ partime-checkin\n' +
+      'ยินดีต้อนรับสู่ บริษัท วอร์ด้า กินแคร์\n\n' +
       '- กดเมนู "ลงทะเบียน" เพื่อสมัครครั้งแรก\n' +
       '- หรือพิมพ์ "id" เพื่อรับ LINE User ID ของคุณ');
   }
@@ -101,7 +100,8 @@ function handleMessageEvent_(ev) {
   if (text.toLowerCase() === 'id') {
     return replyText(ev.replyToken,
       'LINE User ID ของคุณ:\n\n' + userId + '\n\n' +
-      'copy ส่งให้พี่ปุ้ย (เจ้าของ) เพื่อตั้งเป็น OWNER_LINE_USER_ID');
+      'คัดลอกส่งให้เจ้าของเพื่อบันทึกในระบบ\n\n' +
+      'บริษัท วอร์ด้า กินแคร์');
   }
 
   const lower = text.toLowerCase();
@@ -119,7 +119,8 @@ function handleMessageEvent_(ev) {
     'พิมพ์ "id" รับ LINE User ID\n' +
     'พิมพ์ "รอ" ดูรายการรออนุมัติ (เจ้าของ)\n' +
     'พิมพ์ "รายงาน" หรือ "รายงาน 2026-05-10" ดูสรุปวัน (เจ้าของ)\n' +
-    'หรือใช้เมนูด้านล่าง: ลงทะเบียน / เช็คอิน / ดูยอด');
+    'หรือใช้เมนูด้านล่าง: ลงทะเบียน / เช็คอิน / ดูยอด\n\n' +
+    'บริษัท วอร์ด้า กินแคร์');
 }
 
 /**
@@ -372,10 +373,10 @@ function updateCheckinStatus_(checkinId, action, type) {
 
 function formatApprovalReply_(r) {
   if (r.status === 'rejected') {
-    return '✅ ไม่อนุมัติเรียบร้อย\n' + r.employeeName + ' — ' + r.date;
+    return 'ไม่อนุมัติเรียบร้อย\n' + r.employeeName + ' — ' + r.date;
   }
   const t = r.dayType === 'full' ? 'เต็มวัน' : 'ครึ่งวัน';
-  return '✅ อนุมัติเรียบร้อย\n' + r.employeeName + ' — ' + r.date + '\n' + t + ' ' + r.wage + ' บาท';
+  return 'อนุมัติเรียบร้อย\n' + r.employeeName + ' — ' + r.date + '\n' + t + ' ' + r.wage + ' บาท';
 }
 
 function jsonOut_(obj) {

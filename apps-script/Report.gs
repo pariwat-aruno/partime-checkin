@@ -91,26 +91,26 @@ function replyDailyReport_(ev, dateStr) {
   }
 
   // build text report
-  const lines = ['📋 รายงาน ' + date + ' (' + list.length + ' คน)', ''];
+  const lines = ['รายงาน ' + date + ' (' + list.length + ' คน) — บริษัท วอร์ด้า กินแคร์', ''];
   let completeCount = 0, incompleteCount = 0, noScanCount = 0;
 
   list.forEach(function (e) {
-    let icon;
+    let tag;
     if (!e.has_row) {
-      icon = '🚫'; noScanCount++;
+      tag = '[ไม่สแกน]'; noScanCount++;
     } else if (e.scan_count === 4) {
-      icon = '✅'; completeCount++;
+      tag = '[ครบ]'; completeCount++;
     } else {
-      icon = '⚠️'; incompleteCount++;
+      tag = '[ไม่ครบ]'; incompleteCount++;
     }
-    let line = icon + ' ' + e.employee_id + ' ' + e.display_name + ' — ' +
-      (e.has_row ? ('สแกน ' + e.scan_count + '/4') : 'ไม่ได้สแกน');
+    let line = tag + ' ' + e.employee_id + ' ' + e.display_name + ' — ' +
+      (e.has_row ? ('สแกน ' + e.scan_count + '/4') : '0/4');
     if (e.has_row) {
       line += ' — ' + e.status;
       if (e.status === 'approved' && e.day_type) {
         line += ' (' + e.day_type + ' ' + e.wage + ')';
       }
-      if (e.has_out_of_range) line += ' 📍นอกรัศมี';
+      if (e.has_out_of_range) line += ' [นอกรัศมี]';
     }
     lines.push(line);
   });

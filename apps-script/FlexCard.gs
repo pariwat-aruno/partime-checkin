@@ -1,51 +1,50 @@
 /**
- * FlexCard.gs — สร้าง flex JSON สำหรับเจ้าของอนุมัติ (4-slot version)
+ * FlexCard.gs — flex JSON สำหรับเจ้าของ (cherry red minimal — บริษัท วอร์ด้า กินแคร์)
  *
- * input: {
- *   checkinId, displayName, phone, date,
- *   slots: [{slot, label, at, url, completed}, ...],
- *   referenceSelfieUrl, lastDistanceM, radiusM,
- *   hasOutOfRange, scanCount
- * }
- * output: message object สำหรับ push (type=flex)
+ * cards 3 ตัว:
+ *   - buildApprovalCard       (สแกนครบ 4 → ปุ่ม approve/reject)
+ *   - buildScanProgressCard   (slot 1-3 → progress only ไม่มีปุ่ม)
+ *   - buildRegistrationCard   (พาร์ทไทม์ลงทะเบียนใหม่ → informational)
  */
+
+const BRAND = 'บริษัท วอร์ด้า กินแคร์';
+const CHERRY      = '#c8102e';
+const CHERRY_DARK = '#9a0c24';
+const TEXT        = '#111827';
+const MUTED       = '#6b7280';
+const WARNING     = '#d97706';
+const REJECT      = '#374151';
 
 function buildApprovalCard(args) {
   const dateText = formatBangkokDateOnly_(args.date);
-  const hasOutOfRange = args.hasOfRange === true || args.hasOutOfRange === true;
+  const hasOutOfRange = args.hasOutOfRange === true;
   const scanCount = args.scanCount || (args.slots || []).filter(function (s) { return s.completed; }).length;
   const incomplete = scanCount < 4;
 
-  // สี header
-  let headerBg = '#06c755';
-  let headerLabel = 'รออนุมัติ — สแกนครบ 4/4';
+  let headerLabel = 'รออนุมัติ — สแกนครบ ' + scanCount + '/4';
+  let headerBg = CHERRY;
   if (incomplete && hasOutOfRange) {
-    headerBg = '#e53935';
-    headerLabel = '⚠️ สแกน ' + scanCount + '/4 + นอกรัศมี';
+    headerBg = CHERRY_DARK;
+    headerLabel = 'รออนุมัติ — สแกน ' + scanCount + '/4 + นอกรัศมี';
   } else if (incomplete) {
-    headerBg = '#fbbc04';
-    headerLabel = '⚠️ สแกนไม่ครบ ' + scanCount + '/4';
+    headerBg = WARNING;
+    headerLabel = 'รออนุมัติ — สแกนไม่ครบ ' + scanCount + '/4';
   } else if (hasOutOfRange) {
-    headerBg = '#e53935';
-    headerLabel = '⚠️ ครบ 4/4 แต่นอกรัศมี';
+    headerBg = CHERRY_DARK;
+    headerLabel = 'รออนุมัติ — สแกนครบแต่นอกรัศมี';
   }
 
-  // 4 รูป slot จัด 2x2 grid (2 row x 2 col)
-  const slotImages2x2 = [
+  // 4 รูป 2x2 grid
+  const slotImages = [
     {
-      type: 'box',
-      layout: 'horizontal',
-      spacing: 'sm',
+      type: 'box', layout: 'horizontal', spacing: 'sm',
       contents: [
         slotImageBlock_(args.slots && args.slots[0]),
         slotImageBlock_(args.slots && args.slots[1]),
       ],
     },
     {
-      type: 'box',
-      layout: 'horizontal',
-      spacing: 'sm',
-      margin: 'sm',
+      type: 'box', layout: 'horizontal', spacing: 'sm', margin: 'sm',
       contents: [
         slotImageBlock_(args.slots && args.slots[2]),
         slotImageBlock_(args.slots && args.slots[3]),
@@ -53,199 +52,127 @@ function buildApprovalCard(args) {
     },
   ];
 
-  // reference selfie + ระยะ + ชื่อ
   const distanceText = hasOutOfRange
     ? args.lastDistanceM + ' m (นอกรัศมี ' + args.radiusM + ' m)'
     : args.lastDistanceM + ' m';
-  const distanceColor = hasOutOfRange ? '#e53935' : '#222222';
+  const distanceColor = hasOutOfRange ? CHERRY_DARK : TEXT;
 
-  const bodyContents = slotImages2x2.concat([
+  const bodyContents = slotImages.concat([
     { type: 'separator', margin: 'md' },
     infoRow_('ชื่อ', args.displayName),
     infoRow_('วัน', dateText),
-    infoRow_('สแกน', scanCount + '/4 ' + (incomplete ? '⚠️ ไม่ครบ' : '✅ ครบ')),
+    infoRow_('สแกน', scanCount + '/4'),
     infoRowColored_('ระยะล่าสุด', distanceText, distanceColor),
   ]);
 
   if (incomplete) {
     bodyContents.push({
-      type: 'box',
-      layout: 'vertical',
-      margin: 'md',
-      paddingAll: '10px',
-      backgroundColor: '#fff3e0',
-      cornerRadius: '6px',
+      type: 'box', layout: 'vertical', margin: 'md',
+      paddingAll: '10px', backgroundColor: '#fef3c7', cornerRadius: '6px',
       contents: [{
-        type: 'text',
-        text: '⚠️ สแกนหน้าไม่ครบ 4 ครั้ง — ตรวจสอบก่อนอนุมัติ',
-        size: 'xs',
-        color: '#e65100',
-        wrap: true,
+        type: 'text', text: 'สแกนหน้าไม่ครบ 4 ครั้ง ตรวจสอบก่อนอนุมัติ',
+        size: 'xs', color: WARNING, wrap: true,
       }],
     });
   }
   if (hasOutOfRange) {
     bodyContents.push({
-      type: 'box',
-      layout: 'vertical',
-      margin: 'sm',
-      paddingAll: '10px',
-      backgroundColor: '#fde8e8',
-      cornerRadius: '6px',
+      type: 'box', layout: 'vertical', margin: 'sm',
+      paddingAll: '10px', backgroundColor: '#fef2f2', cornerRadius: '6px',
       contents: [{
-        type: 'text',
-        text: '⚠️ มีบาง slot อยู่นอกพื้นที่หน้างาน',
-        size: 'xs',
-        color: '#8b0000',
-        wrap: true,
+        type: 'text', text: 'มีบาง slot อยู่นอกพื้นที่หน้างาน',
+        size: 'xs', color: CHERRY_DARK, wrap: true,
       }],
     });
   }
 
   return {
     type: 'flex',
-    altText: headerLabel + ' — ' + args.displayName,
+    altText: BRAND + ' — ' + headerLabel + ' — ' + args.displayName,
     contents: {
-      type: 'bubble',
-      size: 'mega',
+      type: 'bubble', size: 'mega',
       header: {
-        type: 'box',
-        layout: 'vertical',
+        type: 'box', layout: 'vertical',
+        backgroundColor: headerBg, paddingAll: '14px',
         contents: [
-          { type: 'text', text: headerLabel, color: '#ffffff', weight: 'bold', size: 'lg', wrap: true },
+          { type: 'text', text: BRAND, color: '#ffffff', size: 'xxs', weight: 'bold' },
+          { type: 'text', text: headerLabel, color: '#ffffff', weight: 'bold', size: 'lg', wrap: true, margin: 'sm' },
         ],
-        backgroundColor: headerBg,
-        paddingAll: '14px',
       },
       body: {
-        type: 'box',
-        layout: 'vertical',
-        spacing: 'md',
-        contents: bodyContents,
+        type: 'box', layout: 'vertical', spacing: 'md', contents: bodyContents,
       },
       footer: {
-        type: 'box',
-        layout: 'vertical',
-        spacing: 'sm',
+        type: 'box', layout: 'vertical', spacing: 'sm',
         contents: [
           {
-            type: 'box',
-            layout: 'horizontal',
-            spacing: 'sm',
+            type: 'box', layout: 'horizontal', spacing: 'sm',
             contents: [
-              actionButton_('เต็มวัน 400', 'action=approve&id=' + args.checkinId + '&type=full', '#06c755'),
-              actionButton_('ครึ่งวัน 200', 'action=approve&id=' + args.checkinId + '&type=half', '#fbbc04'),
+              actionButton_('เต็มวัน 400', 'action=approve&id=' + args.checkinId + '&type=full', CHERRY),
+              actionButton_('ครึ่งวัน 200', 'action=approve&id=' + args.checkinId + '&type=half', CHERRY_DARK),
             ],
           },
-          actionButton_('ไม่อนุมัติ', 'action=reject&id=' + args.checkinId, '#e53935'),
+          actionButton_('ไม่อนุมัติ', 'action=reject&id=' + args.checkinId, REJECT),
         ],
       },
     },
   };
 }
 
-/** บล็อกรูป 1 slot — แสดง label + รูป (หรือ "ไม่ได้สแกน" ถ้า incomplete) */
-function slotImageBlock_(slot) {
-  if (!slot) {
-    return placeholderBlock_('—');
-  }
-  if (!slot.completed) {
-    return {
-      type: 'box',
-      layout: 'vertical',
-      flex: 1,
-      contents: [
-        { type: 'text', text: slot.label, size: 'xxs', color: '#aaaaaa', align: 'center' },
-        {
-          type: 'box',
-          layout: 'vertical',
-          height: '120px',
-          backgroundColor: '#f0f0f0',
-          cornerRadius: '6px',
-          margin: 'sm',
-          justifyContent: 'center',
-          contents: [{
-            type: 'text', text: 'ไม่ได้สแกน', size: 'xxs', color: '#999999', align: 'center', wrap: true,
-          }],
-        },
-      ],
-    };
-  }
-  const timeStr = formatBangkokTimeOnly_(slot.at);
+function buildScanProgressCard(args) {
+  const time = formatBangkokTimeOnly_(args.at);
+  const headerBg = args.outOfRange ? CHERRY_DARK : CHERRY;
+  const tag = args.outOfRange ? 'นอกรัศมี ' : '';
+  const headerLabel = tag + 'สแกน ' + args.slotLabel + ' (' + args.scanCount + '/4)';
+  const distanceText = args.outOfRange
+    ? args.distanceM + ' m (นอกรัศมี ' + args.radiusM + ' m)'
+    : args.distanceM + ' m';
+  const distanceColor = args.outOfRange ? CHERRY_DARK : TEXT;
+
   return {
-    type: 'box',
-    layout: 'vertical',
-    flex: 1,
-    contents: [
-      { type: 'text', text: slot.label + ' ' + timeStr, size: 'xxs', color: '#888888', align: 'center', wrap: true },
-      {
-        type: 'image',
-        url: driveUrlToThumbnail_(slot.url) || 'https://via.placeholder.com/300x300?text=no+image',
-        size: 'full',
-        aspectMode: 'cover',
-        aspectRatio: '1:1',
-        margin: 'sm',
+    type: 'flex',
+    altText: BRAND + ' — ' + headerLabel + ' — ' + args.displayName,
+    contents: {
+      type: 'bubble', size: 'kilo',
+      header: {
+        type: 'box', layout: 'vertical',
+        backgroundColor: headerBg, paddingAll: '12px',
+        contents: [
+          { type: 'text', text: BRAND, color: '#ffffff', size: 'xxs', weight: 'bold' },
+          { type: 'text', text: headerLabel, color: '#ffffff', weight: 'bold', size: 'md', wrap: true, margin: 'sm' },
+          { type: 'text', text: time + '  •  ' + args.displayName, color: '#ffffff', size: 'xs', margin: 'sm' },
+        ],
       },
-    ],
-  };
-}
-
-function placeholderBlock_(label) {
-  return {
-    type: 'box',
-    layout: 'vertical',
-    flex: 1,
-    contents: [
-      { type: 'text', text: label, size: 'xxs', color: '#aaaaaa', align: 'center' },
-    ],
-  };
-}
-
-function infoRow_(label, value) {
-  return infoRowColored_(label, value, '#222222');
-}
-
-function infoRowColored_(label, value, color) {
-  return {
-    type: 'box',
-    layout: 'horizontal',
-    contents: [
-      { type: 'text', text: label, size: 'sm', color: '#888888', flex: 2 },
-      { type: 'text', text: String(value), size: 'sm', color: color, flex: 5, wrap: true, weight: 'bold' },
-    ],
-  };
-}
-
-function actionButton_(label, postbackData, color) {
-  return {
-    type: 'button',
-    style: 'primary',
-    color: color,
-    height: 'sm',
-    action: {
-      type: 'postback',
-      label: label,
-      data: postbackData,
-      displayText: label,
+      body: {
+        type: 'box', layout: 'vertical', spacing: 'sm',
+        contents: [
+          {
+            type: 'image',
+            url: driveUrlToThumbnail_(args.selfieUrl) || 'https://via.placeholder.com/300x300',
+            size: 'full', aspectMode: 'cover', aspectRatio: '1:1',
+          },
+          { type: 'separator', margin: 'sm' },
+          infoRow_('พนักงาน', args.employeeId + ' — ' + args.displayName),
+          infoRowColored_('ระยะ', distanceText, distanceColor),
+          infoRow_('สแกนแล้ว', args.scanCount + '/4'),
+        ],
+      },
     },
   };
 }
 
-/**
- * Card สำหรับ "พาร์ทไทม์ใหม่ลงทะเบียน" — push หา owner ตอน register สำเร็จ
- * input: { employeeId, displayName, phone, bankName, bankAccountNo, bankAccountName, selfieUrl, idCardUrl }
- */
 function buildRegistrationCard(args) {
   return {
     type: 'flex',
-    altText: '🆕 พาร์ทไทม์ใหม่: ' + args.displayName,
+    altText: BRAND + ' — พาร์ทไทม์ใหม่: ' + args.displayName,
     contents: {
-      type: 'bubble',
-      size: 'mega',
+      type: 'bubble', size: 'mega',
       header: {
-        type: 'box', layout: 'vertical', backgroundColor: '#06c755', paddingAll: '14px',
+        type: 'box', layout: 'vertical',
+        backgroundColor: CHERRY, paddingAll: '14px',
         contents: [
-          { type: 'text', text: '🆕 พาร์ทไทม์ลงทะเบียนใหม่', color: '#ffffff', weight: 'bold', size: 'lg' },
+          { type: 'text', text: BRAND, color: '#ffffff', size: 'xxs', weight: 'bold' },
+          { type: 'text', text: 'พาร์ทไทม์ลงทะเบียนใหม่', color: '#ffffff', weight: 'bold', size: 'lg', margin: 'sm' },
           { type: 'text', text: args.employeeId, color: '#ffffff', size: 'sm', margin: 'sm' },
         ],
       },
@@ -270,55 +197,44 @@ function buildRegistrationCard(args) {
       footer: {
         type: 'box', layout: 'vertical',
         contents: [{
-          type: 'text', size: 'xs', color: '#888888', wrap: true, align: 'center',
-          text: 'ตรวจสอบ + ระงับ is_active=FALSE ใน Sheet ถ้าไม่ผ่าน',
+          type: 'text', size: 'xs', color: MUTED, wrap: true, align: 'center',
+          text: 'ตรวจสอบในระบบ — ระงับด้วย is_active=FALSE ใน Sheet ถ้าไม่ผ่าน',
         }],
       },
     },
   };
 }
 
-/**
- * Card สำหรับ "สแกน slot N (1-3)" — push หา owner หลังแต่ละ scan
- * input: { displayName, employeeId, slot, slotLabel, scanCount, selfieUrl, distanceM, radiusM, outOfRange, at }
- */
-function buildScanProgressCard(args) {
-  const time = formatBangkokTimeOnly_(args.at);
-  const headerBg = args.outOfRange ? '#e53935' : '#1565c0';
-  const headerLabel = (args.outOfRange ? '⚠️ ' : '✓ ') + 'สแกน ' + args.slotLabel + ' (' + args.scanCount + '/4)';
-  const distanceText = args.outOfRange
-    ? args.distanceM + ' m (นอกรัศมี ' + args.radiusM + ' m)'
-    : args.distanceM + ' m';
-  const distanceColor = args.outOfRange ? '#e53935' : '#222222';
-
+function slotImageBlock_(slot) {
+  if (!slot) return placeholderBlock_('—');
+  if (!slot.completed) {
+    return {
+      type: 'box', layout: 'vertical', flex: 1,
+      contents: [
+        { type: 'text', text: slot.label, size: 'xxs', color: MUTED, align: 'center' },
+        {
+          type: 'box', layout: 'vertical', height: '120px',
+          backgroundColor: '#f3f4f6', cornerRadius: '6px', margin: 'sm',
+          justifyContent: 'center',
+          contents: [{
+            type: 'text', text: 'ไม่ได้สแกน',
+            size: 'xxs', color: MUTED, align: 'center', wrap: true,
+          }],
+        },
+      ],
+    };
+  }
+  const timeStr = formatBangkokTimeOnly_(slot.at);
   return {
-    type: 'flex',
-    altText: headerLabel + ' — ' + args.displayName,
-    contents: {
-      type: 'bubble',
-      size: 'kilo',
-      header: {
-        type: 'box', layout: 'vertical', backgroundColor: headerBg, paddingAll: '12px',
-        contents: [
-          { type: 'text', text: headerLabel, color: '#ffffff', weight: 'bold', size: 'md', wrap: true },
-          { type: 'text', text: time + ' • ' + args.displayName, color: '#ffffff', size: 'xs', margin: 'sm' },
-        ],
+    type: 'box', layout: 'vertical', flex: 1,
+    contents: [
+      { type: 'text', text: slot.label + ' ' + timeStr, size: 'xxs', color: MUTED, align: 'center', wrap: true },
+      {
+        type: 'image',
+        url: driveUrlToThumbnail_(slot.url) || 'https://via.placeholder.com/300x300',
+        size: 'full', aspectMode: 'cover', aspectRatio: '1:1', margin: 'sm',
       },
-      body: {
-        type: 'box', layout: 'vertical', spacing: 'sm',
-        contents: [
-          {
-            type: 'image',
-            url: driveUrlToThumbnail_(args.selfieUrl) || 'https://via.placeholder.com/300x300',
-            size: 'full', aspectMode: 'cover', aspectRatio: '1:1',
-          },
-          { type: 'separator', margin: 'sm' },
-          infoRow_('พนักงาน', args.employeeId + ' — ' + args.displayName),
-          infoRowColored_('ระยะ', distanceText, distanceColor),
-          infoRow_('สแกนแล้ว', args.scanCount + '/4'),
-        ],
-      },
-    },
+    ],
   };
 }
 
@@ -326,13 +242,41 @@ function imageBlockSimple_(label, url) {
   return {
     type: 'box', layout: 'vertical', flex: 1,
     contents: [
-      { type: 'text', text: label, size: 'xxs', color: '#888888', align: 'center' },
+      { type: 'text', text: label, size: 'xxs', color: MUTED, align: 'center' },
       {
         type: 'image',
         url: driveUrlToThumbnail_(url) || 'https://via.placeholder.com/300x300',
         size: 'full', aspectMode: 'cover', aspectRatio: '1:1', margin: 'sm',
       },
     ],
+  };
+}
+
+function placeholderBlock_(label) {
+  return {
+    type: 'box', layout: 'vertical', flex: 1,
+    contents: [{ type: 'text', text: label, size: 'xxs', color: MUTED, align: 'center' }],
+  };
+}
+
+function infoRow_(label, value) {
+  return infoRowColored_(label, value, TEXT);
+}
+
+function infoRowColored_(label, value, color) {
+  return {
+    type: 'box', layout: 'horizontal',
+    contents: [
+      { type: 'text', text: label, size: 'sm', color: MUTED, flex: 2 },
+      { type: 'text', text: String(value), size: 'sm', color: color, flex: 5, wrap: true, weight: 'bold' },
+    ],
+  };
+}
+
+function actionButton_(label, postbackData, color) {
+  return {
+    type: 'button', style: 'primary', color: color, height: 'sm',
+    action: { type: 'postback', label: label, data: postbackData, displayText: label },
   };
 }
 

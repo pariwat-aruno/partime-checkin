@@ -61,7 +61,7 @@ function closePeriod(payload) {
   // push สรุปหาเจ้าของทุกคน
   pushToAllOwners([{
     type: 'text',
-    text: '✅ ปิดยอดสำเร็จ\n' +
+    text: 'ปิดยอดสำเร็จ — บริษัท วอร์ด้า กินแคร์\n' +
       emp.display_name + ' (' + emp.employee_id + ')\n' +
       'รอบ ' + period + '\n' +
       stats.full + ' วันเต็ม + ' + stats.half + ' วันครึ่ง = ' + stats.total + ' บาท\n' +

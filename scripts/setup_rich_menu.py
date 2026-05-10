@@ -30,12 +30,14 @@ WIDTH = 2500
 HEIGHT = 843
 SECTION_W = WIDTH // 3  # 833
 
-# สี + label ของแต่ละช่อง
+# cherry red palette — บริษัท วอร์ด้า กินแคร์
+# 3 sections — ใช้ cherry shades ไล่จากเข้มไปอ่อน
 SECTIONS = [
-    {"label": "ลงทะเบียน", "icon": "📝", "color": (6, 199, 85), "liff": LIFF_REGISTER},
-    {"label": "เช็คอิน",   "icon": "📍", "color": (66, 133, 244), "liff": LIFF_CHECKIN},
-    {"label": "ดูยอด",     "icon": "💰", "color": (251, 188, 4),  "liff": LIFF_BALANCE},
+    {"label": "ลงทะเบียน", "color": (200, 16,  46), "liff": LIFF_REGISTER},   # cherry primary
+    {"label": "เช็คอิน",   "color": (154, 12,  36), "liff": LIFF_CHECKIN},    # cherry darker
+    {"label": "ดูยอด",     "color": (110,  8,  24), "liff": LIFF_BALANCE},    # cherry deepest
 ]
+BRAND_TEXT = "บริษัท วอร์ด้า กินแคร์"
 
 THAI_FONT_PATHS = [
     "/System/Library/Fonts/Supplemental/SukhumvitSet.ttc",
@@ -50,7 +52,7 @@ API_DATA = "https://api-data.line.me"
 def get_token():
     tok = os.environ.get("LINE_CHANNEL_ACCESS_TOKEN")
     if not tok:
-        sys.exit("❌ ตั้ง env LINE_CHANNEL_ACCESS_TOKEN ก่อน")
+        sys.exit("[error] ตั้ง env LINE_CHANNEL_ACCESS_TOKEN ก่อน")
     return tok
 
 
@@ -64,30 +66,41 @@ def load_thai_font(size: int):
 def make_image():
     img = Image.new("RGB", (WIDTH, HEIGHT), "white")
     draw = ImageDraw.Draw(img)
-    label_font = load_thai_font(140)
-    icon_font = load_thai_font(200)
+    label_font = load_thai_font(150)
+    brand_font = load_thai_font(38)
+
+    BRAND_BAND_H = 80  # แถบล่างใส่ brand
+    main_h = HEIGHT - BRAND_BAND_H
 
     for i, sec in enumerate(SECTIONS):
         x0 = i * SECTION_W
         x1 = x0 + SECTION_W
-        # พื้น
-        draw.rectangle([x0, 0, x1, HEIGHT], fill=sec["color"])
-        # ขีดแบ่ง
+        # พื้น (เฉพาะส่วน main)
+        draw.rectangle([x0, 0, x1, main_h], fill=sec["color"])
+        # ขีดแบ่งแบบ minimal
         if i > 0:
-            draw.line([x0, 0, x0, HEIGHT], fill="white", width=4)
+            draw.line([x0, 30, x0, main_h - 30], fill="white", width=3)
 
-        # icon (emoji อาจ render ไม่ครบใน PIL — fallback แค่ label ก็พอ)
+        # label center vertically ใน main area
         cx = x0 + SECTION_W // 2
-
-        # label
         bbox = draw.textbbox((0, 0), sec["label"], font=label_font)
         text_w = bbox[2] - bbox[0]
         text_h = bbox[3] - bbox[1]
-        ty = HEIGHT // 2 - text_h // 2
+        ty = (main_h - text_h) // 2 - 10
         draw.text((cx - text_w // 2, ty), sec["label"], font=label_font, fill="white")
 
+    # แถบ brand ด้านล่าง — สีอ่อน + cherry text
+    draw.rectangle([0, main_h, WIDTH, HEIGHT], fill=(249, 250, 251))  # near-white
+    draw.line([0, main_h, WIDTH, main_h], fill=(229, 231, 235), width=2)
+    bbox = draw.textbbox((0, 0), BRAND_TEXT, font=brand_font)
+    bw = bbox[2] - bbox[0]
+    bh = bbox[3] - bbox[1]
+    bx = (WIDTH - bw) // 2
+    by = main_h + (BRAND_BAND_H - bh) // 2 - 8
+    draw.text((bx, by), BRAND_TEXT, font=brand_font, fill=(154, 12, 36))
+
     img.save(IMAGE_PATH, format="PNG")
-    print(f"✅ เขียนรูป {IMAGE_PATH} ({WIDTH}x{HEIGHT})")
+    print(f"เขียนรูป {IMAGE_PATH} ({WIDTH}x{HEIGHT})")
     return IMAGE_PATH
 
 
@@ -103,7 +116,7 @@ def request_json(method, url, token, body=None):
             raw = resp.read().decode("utf-8")
             return json.loads(raw) if raw else {}
     except urllib.error.HTTPError as e:
-        sys.exit(f"❌ {method} {url} → {e.code} {e.read().decode('utf-8', 'ignore')}")
+        sys.exit(f"[error] {method} {url} -> {e.code} {e.read().decode('utf-8', 'ignore')}")
 
 
 def cleanup_old(token):
@@ -111,7 +124,7 @@ def cleanup_old(token):
     for menu in res.get("richmenus", []):
         if menu.get("name") == MENU_NAME:
             mid = menu["richMenuId"]
-            print(f"🧹 ลบ rich menu เดิม {mid}")
+            print(f"ลบ rich menu เดิม {mid}")
             request_json("DELETE", f"{API_BASE}/v2/bot/richmenu/{mid}", token)
 
 
@@ -135,7 +148,7 @@ def create_menu_structure(token):
     }
     res = request_json("POST", f"{API_BASE}/v2/bot/richmenu", token, body=payload)
     rid = res["richMenuId"]
-    print(f"✅ สร้าง rich menu structure id={rid}")
+    print(f"สร้าง rich menu structure id={rid}")
     return rid
 
 
@@ -150,14 +163,14 @@ def upload_image(token, rid, path):
     )
     try:
         with urllib.request.urlopen(req) as resp:
-            print(f"✅ อัปรูปสำเร็จ ({len(data)} bytes)")
+            print(f"อัปรูปสำเร็จ ({len(data)} bytes)")
     except urllib.error.HTTPError as e:
-        sys.exit(f"❌ upload image → {e.code} {e.read().decode('utf-8', 'ignore')}")
+        sys.exit(f"[error] upload image -> {e.code} {e.read().decode('utf-8', 'ignore')}")
 
 
 def set_default(token, rid):
     request_json("POST", f"{API_BASE}/v2/bot/user/all/richmenu/{rid}", token)
-    print(f"✅ ตั้ง {rid} เป็น default rich menu แล้ว")
+    print(f"ตั้ง {rid} เป็น default rich menu แล้ว")
 
 
 def main():

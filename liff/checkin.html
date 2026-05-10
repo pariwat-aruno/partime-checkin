@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>เช็คอิน — partime-checkin</title>
+  <title>เช็คอิน — บริษัท วอร์ด้า กินแคร์</title>
   <link rel="stylesheet" href="./css/style.css" />
   <style>
     .slot-status-grid {
@@ -11,18 +11,26 @@
       gap: 6px; margin-bottom: 14px;
     }
     .slot-status {
-      background: #f0f0f0; border-radius: 8px; padding: 10px 4px;
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 8px; padding: 10px 4px;
       text-align: center; font-size: 11px;
     }
-    .slot-status.done    { background: #e8f5e9; color: #1b5e20; }
-    .slot-status.current { background: #fff3e0; color: #e65100; outline: 2px solid #fbbc04; }
-    .slot-status .icon   { font-size: 20px; display: block; margin-bottom: 2px; }
+    .slot-status.done {
+      background: var(--cherry-tint); border-color: var(--cherry);
+      color: var(--cherry-dark);
+    }
+    .slot-status.current {
+      background: var(--cherry); color: #fff;
+      border-color: var(--cherry-dark);
+    }
+    .slot-status .marker { font-size: 14px; display: block; margin-bottom: 2px; font-weight: 700; }
     .slot-status .label  { font-weight: 600; }
 
     .current-slot-banner {
-      background: #06c755; color: #fff; padding: 12px;
-      border-radius: 8px; text-align: center; margin-bottom: 14px;
-      font-weight: 600;
+      background: var(--cherry); color: var(--white);
+      padding: 12px; border-radius: 8px;
+      text-align: center; margin-bottom: 14px;
+      font-weight: 600; font-size: 14px;
     }
 
     #video-wrap {
@@ -34,7 +42,8 @@
       width: 100%; height: 100%; object-fit: cover; display: block;
     }
     #captured { display: none; }
-    .cam-status { position: absolute; top:8px; left:8px; right:8px;
+    .cam-status {
+      position: absolute; top:8px; left:8px; right:8px;
       color:#fff; font-size:12px; text-align:center;
       text-shadow: 0 1px 2px rgba(0,0,0,0.6);
     }
@@ -42,8 +51,9 @@
 </head>
 <body>
   <div class="card">
-    <h1>📍 เช็คอิน</h1>
-    <div class="subtitle">สแกนหน้า 4 ครั้ง/วัน — บังคับถ่ายสด ห้ามเลือกรูป</div>
+    <div class="brand">บริษัท วอร์ด้า กินแคร์</div>
+    <h1>เช็คอิน</h1>
+    <div class="subtitle">สแกนหน้า 4 ครั้งต่อวัน — บังคับถ่ายสดเท่านั้น</div>
 
     <div id="error" class="error" style="display:none"></div>
     <div id="success" class="success-banner" style="display:none"></div>
@@ -68,16 +78,18 @@
         <img      id="captured" alt="captured" />
       </div>
 
-      <button id="btn-capture" class="btn-primary" disabled>📷 ถ่ายภาพ</button>
+      <button id="btn-capture" class="btn-primary" disabled>ถ่ายภาพ</button>
       <button id="btn-retake"  class="btn-secondary" style="display:none">ถ่ายใหม่</button>
-      <button id="btn-submit"  class="btn-primary"  style="display:none;margin-top:10px">ส่งเช็คอิน</button>
+      <button id="btn-submit"  class="btn-primary"   style="display:none;margin-top:10px">ส่งเช็คอิน</button>
 
       <div class="note">
-        <strong>วิธี:</strong> กดถ่าย → กดส่ง → รอเจ้าของอนุมัติหลังจากครบ 4 ครั้ง<br/>
-        นอกรัศมี = ส่งได้แต่ flag ให้เจ้าของพิจารณา
+        <strong>วิธี:</strong> กดถ่าย แล้วกดส่ง รอเจ้าของอนุมัติหลังสแกนครบ 4 ครั้ง<br/>
+        นอกรัศมีหน้างาน = ส่งได้แต่จะ flag ให้เจ้าของพิจารณา
       </div>
     </div>
   </div>
+
+  <div class="page-footer">บริษัท วอร์ด้า กินแคร์</div>
 
   <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <script type="module">
@@ -108,9 +120,8 @@
     let todayStatus = null;
 
     async function boot() {
-      try {
-        await initAuth(CONFIG.LIFF_ID_CHECKIN);
-      } catch (e) {
+      try { await initAuth(CONFIG.LIFF_ID_CHECKIN); }
+      catch (e) {
         bootEl.style.display = 'none';
         showError(errEl, 'LIFF init: ' + e.message);
         return;
@@ -120,9 +131,9 @@
       } catch (e) {
         bootEl.style.display = 'none';
         if (e.code === 'not_registered') {
-          showError(errEl, 'ยังไม่ได้ลงทะเบียน — กดเมนู "ลงทะเบียน" ก่อน');
+          showError(errEl, 'ยังไม่ได้ลงทะเบียน กดเมนู "ลงทะเบียน" ก่อน');
         } else if (e.code === 'inactive') {
-          showError(errEl, 'บัญชีถูกระงับ — ติดต่อเจ้าของ');
+          showError(errEl, 'บัญชีถูกระงับ ติดต่อเจ้าของ');
         } else {
           showError(errEl, e.message || e.code);
         }
@@ -135,7 +146,6 @@
       bootEl.style.display = 'none';
       contentEl.style.display = 'block';
 
-      // ขอ GPS + เปิดกล้องคู่ขนาน
       fetchGps();
       openCamera();
     }
@@ -144,21 +154,21 @@
       const cur = status.currentSlot;
       gridEl.innerHTML = status.slots.map(function (s) {
         const cls = s.completed ? 'done' : (s.slot === cur ? 'current' : '');
-        const icon = s.completed ? '✓' : (s.slot === cur ? '⏳' : '—');
+        const marker = s.completed ? 'OK' : (s.slot === cur ? 'NOW' : '—');
         return '<div class="slot-status ' + cls + '">' +
-                  '<span class="icon">' + icon + '</span>' +
+                  '<span class="marker">' + marker + '</span>' +
                   '<span class="label">' + s.label + '</span>' +
                 '</div>';
       }).join('');
 
       const curSlot = status.slots.find(function(s){ return s.slot === cur; });
       if (curSlot && curSlot.completed) {
-        bannerEl.style.background = '#888';
+        bannerEl.style.background = 'var(--muted)';
         bannerEl.textContent = '"' + status.currentSlotLabel + '" สแกนไปแล้ว — รอ slot ถัดไป';
         btnCapture.disabled = true;
         btnCapture.textContent = 'สแกนซ้ำไม่ได้';
       } else {
-        bannerEl.textContent = '🎯 กำลังสแกน slot ที่ ' + cur + ': "' + status.currentSlotLabel + '"';
+        bannerEl.textContent = 'กำลังสแกน slot ที่ ' + cur + ': ' + status.currentSlotLabel;
       }
     }
 
@@ -195,9 +205,7 @@
         btnCapture.style.display = 'none';
         btnRetake.style.display = 'block';
         btnSubmit.style.display = 'block';
-      } catch (e) {
-        showError(errEl, e.message);
-      }
+      } catch (e) { showError(errEl, e.message); }
     });
 
     btnRetake.addEventListener('click', () => {
@@ -224,30 +232,24 @@
           selfieBase64: capturedBase64,
           slot:         todayStatus.currentSlot,
         });
-
-        // ปิดกล้อง
         stopCamera(camStream); camStream = null;
 
         okEl.style.display = 'block';
         let msg = '';
         if (result.alreadyScanned) {
-          msg = '⏰ slot นี้สแกนไปแล้ว';
+          msg = 'slot นี้สแกนไปแล้ว';
         } else if (result.completed) {
-          msg = '✅ สแกนครบ 4/4 — ส่ง flex card หาเจ้าของแล้ว';
+          msg = 'สแกนครบ 4/4 — ส่งคำขออนุมัติให้เจ้าของแล้ว';
         } else {
-          msg = '✓ slot ' + result.slot + ' (' + result.slotLabel + ') บันทึกแล้ว — สแกน ' +
-                result.scanCount + '/4';
+          msg = 'บันทึก slot ' + result.slot + ' (' + result.slotLabel + ') แล้ว — ' +
+                'สแกน ' + result.scanCount + '/4';
         }
         if (result.outOfRange) {
-          okEl.style.background = '#fff3e0';
-          okEl.style.borderLeftColor = '#e65100';
-          okEl.style.color = '#e65100';
-          msg += '\n⚠️ นอกรัศมี ' + result.distanceM + ' m — flag ส่งให้เจ้าของพิจารณา';
+          msg += '\nนอกรัศมี ' + result.distanceM + ' m — flag ส่งให้เจ้าของพิจารณา';
         }
         okEl.style.whiteSpace = 'pre-line';
         okEl.textContent = msg;
 
-        // ซ่อนปุ่มหลังส่ง
         btnSubmit.style.display = 'none';
         btnRetake.style.display = 'none';
         bannerEl.style.display = 'none';
@@ -260,14 +262,11 @@
 
     function updateBtn() {
       const ready = coords && camStream;
-      // ถ้า slot ปัจจุบันสแกนไปแล้ว — ปุ่มยังถูก disable จาก renderSlotGrid
       const slotDone = todayStatus && todayStatus.slots.find(function(s){ return s.slot === todayStatus.currentSlot && s.completed; });
       btnCapture.disabled = !ready || !!slotDone;
     }
 
-    // cleanup กล้องเมื่อปิดหน้า
     window.addEventListener('pagehide', () => stopCamera(camStream));
-
     boot();
   </script>
 </body>
