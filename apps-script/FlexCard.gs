@@ -1,5 +1,5 @@
 /**
- * FlexCard.gs — flex JSON สำหรับเจ้าของ (cherry red minimal — บริษัท วอร์ด้า กินแคร์)
+ * FlexCard.gs — flex JSON สำหรับเจ้าของ (cherry red minimal — บริษัท วอร์ด้า สกินแคร์ จำกัด)
  *
  * cards 3 ตัว:
  *   - buildApprovalCard       (สแกนครบ 4 → ปุ่ม approve/reject)
@@ -7,7 +7,7 @@
  *   - buildRegistrationCard   (พาร์ทไทม์ลงทะเบียนใหม่ → informational)
  */
 
-const BRAND = 'บริษัท วอร์ด้า กินแคร์';
+const BRAND = 'บริษัท วอร์ด้า สกินแคร์ จำกัด';
 const LOGO_URL = 'https://pariwat-aruno.github.io/partime-checkin/img/logo.jpg';
 const CHERRY      = '#c8102e';
 const CHERRY_DARK = '#9a0c24';

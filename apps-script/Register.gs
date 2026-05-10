@@ -62,7 +62,7 @@ function register(payload) {
 
   // welcome message หาผู้ลงทะเบียน
   pushText(payload.lineUserId,
-    'ยินดีต้อนรับสู่ บริษัท วอร์ด้า กินแคร์\n' +
+    'ยินดีต้อนรับสู่ บริษัท วอร์ด้า สกินแคร์ จำกัด\n' +
     payload.displayName + ' (' + employeeId + ')\n\n' +
     'ลงทะเบียนเรียบร้อย กดเมนู "เช็คอิน" ตอนถึงร้านได้เลย');
 

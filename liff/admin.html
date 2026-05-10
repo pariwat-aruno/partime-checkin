@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>Owner — บริษัท วอร์ด้า กินแคร์</title>
+  <title>Owner — บริษัท วอร์ด้า สกินแคร์ จำกัด</title>
   <link rel="stylesheet" href="./css/style.css" />
   <style>
     .period-picker { display: flex; gap: 8px; margin-bottom: 16px; }
@@ -93,8 +93,8 @@
     }
     .pending-slots .s .lbl {
       position: absolute; bottom: 0; left: 0; right: 0;
-      background: rgba(17,24,39,0.7); color: #fff; font-size: 9px;
-      padding: 2px; text-align: center;
+      background: rgba(17,24,39,0.78); color: #fff; font-size: 9px;
+      padding: 3px 2px; text-align: center; line-height: 1.2;
     }
 
     .pending-actions { display: flex; gap: 6px; }
@@ -107,7 +107,7 @@
 <body>
   <div class="card">
     <img class="logo" src="./img/logo.jpg" alt="VORDA SKINCARE" />
-    <div class="brand">บริษัท วอร์ด้า กินแคร์</div>
+    <div class="brand">บริษัท วอร์ด้า สกินแคร์ จำกัด</div>
     <h1>Owner — จัดการยอด</h1>
     <div class="subtitle">เฉพาะเจ้าของ — สรุปยอดต่อพาร์ทไทม์ ปิดยอด ทำเครื่องหมายจ่าย</div>
 
@@ -123,7 +123,7 @@
     </div>
   </div>
 
-  <div class="page-footer">บริษัท วอร์ด้า กินแคร์</div>
+  <div class="page-footer">บริษัท วอร์ด้า สกินแคร์ จำกัด</div>
 
   <div id="pending-modal" hidden>
     <div class="inner">
@@ -279,8 +279,10 @@
       pbody.innerHTML = items.map(function (it) {
         const slotsHtml = it.slots.map(function (s) {
           if (s.completed) {
+            // s.at = "d MMM yyyy HH:mm" จาก backend → เอาเฉพาะ HH:mm
+            const timeOnly = s.at ? s.at.split(' ').pop() : '';
             return '<div class="s"><img src="' + escape_(s.thumb) + '" alt=""/>' +
-                   '<div class="lbl">' + escape_(s.label) + '</div></div>';
+                   '<div class="lbl">' + escape_(s.label) + (timeOnly ? '<br/>' + escape_(timeOnly) : '') + '</div></div>';
           }
           return '<div class="s"><div class="empty">' + escape_(s.label) + '<br/>—</div></div>';
         }).join('');

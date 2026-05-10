@@ -91,7 +91,7 @@ function replyDailyReport_(ev, dateStr) {
   }
 
   // build text report
-  const lines = ['รายงาน ' + date + ' (' + list.length + ' คน) — บริษัท วอร์ด้า กินแคร์', ''];
+  const lines = ['รายงาน ' + date + ' (' + list.length + ' คน) — บริษัท วอร์ด้า สกินแคร์ จำกัด', ''];
   let completeCount = 0, incompleteCount = 0, noScanCount = 0;
 
   list.forEach(function (e) {

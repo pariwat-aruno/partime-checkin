@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>เช็คอิน — บริษัท วอร์ด้า กินแคร์</title>
+  <title>เช็คอิน — บริษัท วอร์ด้า สกินแคร์ จำกัด</title>
   <link rel="stylesheet" href="./css/style.css" />
   <style>
     .slot-status-grid {
@@ -52,7 +52,7 @@
 <body>
   <div class="card">
     <img class="logo" src="./img/logo.jpg" alt="VORDA SKINCARE" />
-    <div class="brand">บริษัท วอร์ด้า กินแคร์</div>
+    <div class="brand">บริษัท วอร์ด้า สกินแคร์ จำกัด</div>
     <h1>เช็คอิน</h1>
     <div class="subtitle">สแกนหน้า 4 ครั้งต่อวัน — บังคับถ่ายสดเท่านั้น</div>
 
@@ -90,7 +90,7 @@
     </div>
   </div>
 
-  <div class="page-footer">บริษัท วอร์ด้า กินแคร์</div>
+  <div class="page-footer">บริษัท วอร์ด้า สกินแคร์ จำกัด</div>
 
   <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <script type="module">
@@ -98,7 +98,7 @@
     import { initAuth, state } from './js/auth.js';
     import { api } from './js/api.js';
     import { getGeolocation, showError, clearError } from './js/utils.js';
-    import { startCamera, captureFromVideo, stopCamera } from './js/camera.js';
+    import { startCamera, captureFromVideoWithStamp, stopCamera } from './js/camera.js';
 
     const errEl   = document.getElementById('error');
     const okEl    = document.getElementById('success');
@@ -199,7 +199,8 @@
 
     btnCapture.addEventListener('click', () => {
       try {
-        capturedBase64 = captureFromVideo(videoEl);
+        const slotLabel = todayStatus.currentSlotLabel || ('slot ' + todayStatus.currentSlot);
+        capturedBase64 = captureFromVideoWithStamp(videoEl, slotLabel);
         capturedEl.src = capturedBase64;
         videoEl.style.display = 'none';
         capturedEl.style.display = 'block';

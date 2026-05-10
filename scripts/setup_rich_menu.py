@@ -30,14 +30,14 @@ LOGO_PATH = os.path.join(os.path.dirname(__file__), "..", "liff", "img", "logo.j
 WIDTH = 2500
 HEIGHT = 843
 
-# cherry red palette — บริษัท วอร์ด้า กินแคร์
+# cherry red palette — บริษัท วอร์ด้า สกินแคร์ จำกัด
 # 2 sections (ลงทะเบียนใช้ bot command "ลงทะเบียน" แทน — ใช้ไม่บ่อย)
 SECTIONS = [
     {"label": "เช็คอิน",   "color": (200, 16,  46), "liff": LIFF_CHECKIN},
     {"label": "ดูยอด",     "color": (154, 12,  36), "liff": LIFF_BALANCE},
 ]
 SECTION_W = WIDTH // len(SECTIONS)  # auto: 2 sections = 1250 each
-BRAND_TEXT = "บริษัท วอร์ด้า กินแคร์"
+BRAND_TEXT = "บริษัท วอร์ด้า สกินแคร์ จำกัด"
 
 THAI_FONT_PATHS = [
     "/System/Library/Fonts/Supplemental/SukhumvitSet.ttc",
