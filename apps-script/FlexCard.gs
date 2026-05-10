@@ -11,10 +11,55 @@
 
 function buildApprovalCard(args) {
   const checkinAt = formatBangkokDateTime_(args.checkinAt);
+  const outOfRange = args.outOfRange === true;
+
+  // ปรับสี header + label ตามสถานะ
+  const headerBg = outOfRange ? '#e53935' : '#06c755';
+  const headerLabel = outOfRange ? '⚠️ รออนุมัติ — นอกรัศมี' : 'รออนุมัติเช็คอิน';
+
+  // แถว distance — ถ้านอกรัศมีให้แสดง "X m (เกิน Y m)" สีแดง
+  const distanceText = outOfRange
+    ? args.distanceM + ' m (เกินรัศมี ' + args.radiusM + ' m)'
+    : args.distanceM + ' m (ในรัศมี ' + args.radiusM + ' m)';
+  const distanceColor = outOfRange ? '#e53935' : '#222222';
+
+  const bodyContents = [
+    {
+      type: 'box',
+      layout: 'horizontal',
+      contents: [
+        imageBlock_('วันนี้', args.selfieUrl),
+        imageBlock_('ลงทะเบียน', args.referenceSelfieUrl),
+      ],
+      spacing: 'sm',
+    },
+    { type: 'separator', margin: 'md' },
+    infoRow_('ชื่อ', args.displayName),
+    infoRow_('เบอร์', args.phone || '—'),
+    infoRowColored_('ระยะ', distanceText, distanceColor),
+  ];
+
+  if (outOfRange) {
+    bodyContents.push({
+      type: 'box',
+      layout: 'vertical',
+      margin: 'md',
+      paddingAll: '10px',
+      backgroundColor: '#fde8e8',
+      cornerRadius: '6px',
+      contents: [{
+        type: 'text',
+        text: '⚠️ พาร์ทไทม์อยู่นอกพื้นที่หน้างาน — ตัดสินใจอนุมัติ/ไม่อนุมัติด้วยวิจารณญาณ',
+        size: 'xs',
+        color: '#8b0000',
+        wrap: true,
+      }],
+    });
+  }
 
   return {
     type: 'flex',
-    altText: 'อนุมัติเช็คอิน — ' + args.displayName,
+    altText: (outOfRange ? '⚠️ นอกรัศมี — ' : '') + 'อนุมัติเช็คอิน — ' + args.displayName,
     contents: {
       type: 'bubble',
       size: 'mega',
@@ -24,7 +69,7 @@ function buildApprovalCard(args) {
         contents: [
           {
             type: 'text',
-            text: 'รออนุมัติเช็คอิน',
+            text: headerLabel,
             color: '#ffffff',
             weight: 'bold',
             size: 'lg',
@@ -37,28 +82,14 @@ function buildApprovalCard(args) {
             margin: 'sm',
           },
         ],
-        backgroundColor: '#06c755',
+        backgroundColor: headerBg,
         paddingAll: '16px',
       },
       body: {
         type: 'box',
         layout: 'vertical',
         spacing: 'md',
-        contents: [
-          {
-            type: 'box',
-            layout: 'horizontal',
-            contents: [
-              imageBlock_('วันนี้', args.selfieUrl),
-              imageBlock_('ลงทะเบียน', args.referenceSelfieUrl),
-            ],
-            spacing: 'sm',
-          },
-          { type: 'separator', margin: 'md' },
-          infoRow_('ชื่อ', args.displayName),
-          infoRow_('เบอร์', args.phone || '—'),
-          infoRow_('ระยะ', args.distanceM + ' เมตร'),
-        ],
+        contents: bodyContents,
       },
       footer: {
         type: 'box',
@@ -107,12 +138,16 @@ function imageBlock_(label, url) {
 }
 
 function infoRow_(label, value) {
+  return infoRowColored_(label, value, '#222222');
+}
+
+function infoRowColored_(label, value, color) {
   return {
     type: 'box',
     layout: 'horizontal',
     contents: [
       { type: 'text', text: label, size: 'sm', color: '#888888', flex: 2 },
-      { type: 'text', text: String(value), size: 'sm', color: '#222222', flex: 5, wrap: true },
+      { type: 'text', text: String(value), size: 'sm', color: color, flex: 5, wrap: true, weight: 'bold' },
     ],
   };
 }

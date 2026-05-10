@@ -111,6 +111,13 @@
         okEl.style.display = 'block';
         if (result.duplicated) {
           okEl.textContent = '⏰ วันนี้เช็คอินไปแล้ว (' + result.checkinId + ')';
+        } else if (result.outOfRange) {
+          okEl.style.background = '#fff3e0';
+          okEl.style.borderLeftColor = '#e65100';
+          okEl.style.color = '#e65100';
+          okEl.innerHTML = '⚠️ <strong>เช็คอินนอกพื้นที่</strong> (ห่าง ' + result.distanceM + ' m)<br/>' +
+            'ส่งคำขอแล้ว — เจ้าของจะเห็น flag "นอกรัศมี" ใน flex card<br/>' +
+            'ถ้าเจ้าของไม่อนุมัติ = ไม่ได้ค่าจ้างวันนั้น';
         } else {
           okEl.textContent = '✅ เช็คอินสำเร็จ — รออนุมัติจากเจ้าของ (' + result.checkinId + ')';
         }
@@ -120,8 +127,6 @@
           showError(errEl, 'ยังไม่ได้ลงทะเบียน — กดเมนู "ลงทะเบียน" ก่อน');
         } else if (e.code === 'inactive') {
           showError(errEl, 'บัญชีถูกระงับ — ติดต่อเจ้าของ');
-        } else if (e.code === 'out_of_range') {
-          showError(errEl, 'อยู่นอกรัศมี — ห่าง ' + e.data.distanceM + ' เมตร');
         } else if (e.code === 'upload_failed') {
           showError(errEl, 'อัพรูปไม่สำเร็จ: ' + (e.data.detail || ''));
         } else {

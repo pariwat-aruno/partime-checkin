@@ -30,14 +30,14 @@ function checkin(payload) {
 
   const cfg = getConfig();
 
-  // 3. geofence
+  // 3. geofence — ไม่ block แล้ว แค่ flag ส่งให้เจ้าของพิจารณา
   const distance = Math.round(haversineMeters(
     Number(payload.lat), Number(payload.lng),
     Number(cfg.geofence_lat), Number(cfg.geofence_lng)
   ));
-  if (distance > Number(cfg.geofence_radius_m)) {
-    logInfo('checkin', 'out_of_range', { employeeId: emp.employee_id, distance: distance });
-    return { ok: false, error: 'out_of_range', distanceM: distance };
+  const outOfRange = distance > Number(cfg.geofence_radius_m);
+  if (outOfRange) {
+    logWarn('checkin', 'out_of_range — flagged', { employeeId: emp.employee_id, distance: distance });
   }
 
   // 4. duplicate วันเดียวกัน
@@ -79,7 +79,7 @@ function checkin(payload) {
 
   logInfo('checkin', 'created', { checkinId: checkinId, employeeId: emp.employee_id, distance: distance });
 
-  // ส่ง flex card หาเจ้าของ
+  // ส่ง flex card หาเจ้าของ (รวม flag outOfRange)
   try {
     const card = buildApprovalCard({
       checkinId: checkinId,
@@ -89,13 +89,15 @@ function checkin(payload) {
       referenceSelfieUrl: emp.selfie_url,
       checkinAt: nowBangkok(),
       distanceM: distance,
+      radiusM: Number(cfg.geofence_radius_m),
+      outOfRange: outOfRange,
     });
     pushMessage(cfg.OWNER_LINE_USER_ID, [card]);
   } catch (err) {
     logError('checkin', 'push flex failed: ' + err.message, { checkinId: checkinId });
   }
 
-  return { ok: true, checkinId: checkinId };
+  return { ok: true, checkinId: checkinId, distanceM: distance, outOfRange: outOfRange };
 }
 
 /** หา checkin ของ employee_id + date — return row object หรือ null */
