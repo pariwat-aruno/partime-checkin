@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>ลงทะเบียน — partime-checkin</title>
+  <link rel="stylesheet" href="./css/style.css" />
+</head>
+<body>
+  <div class="card">
+    <h1>📝 ลงทะเบียนพาร์ทไทม์</h1>
+    <div class="subtitle">กรอกข้อมูลครั้งเดียว ใช้ได้ตลอด</div>
+
+    <div id="error" class="error" style="display:none"></div>
+    <div id="success" class="success-banner" style="display:none"></div>
+
+    <div class="label">LINE User ID (auto)</div>
+    <div id="userid" class="userid-box loading">กำลังโหลด...</div>
+
+    <form id="form" style="display:none">
+      <div class="field">
+        <div class="label">ชื่อ-นามสกุล</div>
+        <input type="text" name="displayName" required maxlength="50" />
+      </div>
+      <div class="field">
+        <div class="label">เบอร์โทร</div>
+        <input type="tel" name="phone" required pattern="[0-9]{9,10}" placeholder="0812345678" />
+      </div>
+      <div class="field">
+        <div class="label">ธนาคาร</div>
+        <select name="bankName" required>
+          <option value="">-- เลือกธนาคาร --</option>
+          <option>กสิกรไทย</option>
+          <option>ไทยพาณิชย์</option>
+          <option>กรุงเทพ</option>
+          <option>กรุงไทย</option>
+          <option>กรุงศรีอยุธยา</option>
+          <option>ทหารไทยธนชาต (ttb)</option>
+          <option>ออมสิน</option>
+          <option>ธ.ก.ส.</option>
+          <option>ซีไอเอ็มบีไทย</option>
+          <option>ยูโอบี</option>
+          <option>อื่นๆ</option>
+        </select>
+      </div>
+      <div class="field">
+        <div class="label">เลขบัญชี</div>
+        <input type="text" name="bankAccountNo" required maxlength="20" placeholder="1234567890" />
+      </div>
+      <div class="field">
+        <div class="label">ชื่อบัญชี</div>
+        <input type="text" name="bankAccountName" required maxlength="80" />
+      </div>
+
+      <div class="file-field">
+        <div class="label">รูป selfie (ใช้กล้องหน้าถ่ายตัวเอง)</div>
+        <input type="file" name="selfie" accept="image/*" capture="user" required />
+        <img id="selfie-preview" class="preview" style="display:none" />
+      </div>
+
+      <div class="file-field">
+        <div class="label">รูปบัตรประชาชน</div>
+        <input type="file" name="idCard" accept="image/*" capture="environment" required />
+        <img id="idcard-preview" class="preview" style="display:none" />
+      </div>
+
+      <button type="submit" id="btn-submit" class="btn-primary">ลงทะเบียน</button>
+    </form>
+
+    <div class="note">
+      <strong>หมายเหตุ:</strong> รูป selfie ใช้เทียบกับวันเช็คอิน — ขอให้ชัดเจน เห็นหน้าทั้งใบ
+    </div>
+  </div>
+
+  <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <script type="module">
+    import { CONFIG } from './js/config.js';
+    import { initAuth, state } from './js/auth.js';
+    import { api } from './js/api.js';
+    import { fileToResizedBase64, showError, clearError } from './js/utils.js';
+
+    const useridEl = document.getElementById('userid');
+    const errEl    = document.getElementById('error');
+    const okEl     = document.getElementById('success');
+    const form     = document.getElementById('form');
+    const btn      = document.getElementById('btn-submit');
+
+    async function boot() {
+      try {
+        await initAuth(CONFIG.LIFF_ID_REGISTER);
+      } catch (e) {
+        showError(errEl, 'LIFF init error: ' + e.message);
+        return;
+      }
+      useridEl.textContent = state.lineUserId;
+      useridEl.classList.remove('loading');
+      // auto-fill display name
+      if (state.profile && state.profile.displayName) {
+        form.displayName.value = state.profile.displayName;
+      }
+      form.style.display = 'block';
+    }
+
+    // preview รูปหลังเลือก
+    form.selfie.addEventListener('change', async (e) => {
+      if (e.target.files[0]) {
+        const b64 = await fileToResizedBase64(e.target.files[0]);
+        document.getElementById('selfie-preview').src = b64;
+        document.getElementById('selfie-preview').style.display = 'block';
+      }
+    });
+    form.idCard.addEventListener('change', async (e) => {
+      if (e.target.files[0]) {
+        const b64 = await fileToResizedBase64(e.target.files[0]);
+        document.getElementById('idcard-preview').src = b64;
+        document.getElementById('idcard-preview').style.display = 'block';
+      }
+    });
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      clearError(errEl);
+      btn.disabled = true;
+      btn.textContent = 'กำลังส่ง...';
+
+      try {
+        if (!form.selfie.files[0] || !form.idCard.files[0]) {
+          throw new Error('กรุณาเลือกรูปทั้ง 2 ใบ');
+        }
+        const selfieBase64 = await fileToResizedBase64(form.selfie.files[0]);
+        const idCardBase64 = await fileToResizedBase64(form.idCard.files[0]);
+
+        const result = await api.post('register', {
+          lineUserId:      state.lineUserId,
+          displayName:     form.displayName.value.trim(),
+          phone:           form.phone.value.trim(),
+          bankName:        form.bankName.value,
+          bankAccountNo:   form.bankAccountNo.value.trim(),
+          bankAccountName: form.bankAccountName.value.trim(),
+          selfieBase64:    selfieBase64,
+          idCardBase64:    idCardBase64,
+        });
+
+        okEl.style.display = 'block';
+        okEl.textContent = '✅ ลงทะเบียนเรียบร้อย — ' + result.employeeId;
+        form.style.display = 'none';
+      } catch (e) {
+        if (e.code === 'already_registered') {
+          showError(errEl, 'คุณลงทะเบียนแล้ว — กดเมนู "เช็คอิน" ได้เลย');
+        } else if (e.code === 'upload_failed') {
+          showError(errEl, 'อัพรูปไม่สำเร็จ ลองใหม่: ' + (e.data.detail || ''));
+        } else {
+          showError(errEl, 'ผิดพลาด: ' + (e.message || e.code));
+        }
+        btn.disabled = false;
+        btn.textContent = 'ลงทะเบียน';
+      }
+    });
+
+    boot();
+  </script>
+</body>
+</html>

@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>ดูยอด — partime-checkin</title>
+  <link rel="stylesheet" href="./css/style.css" />
+</head>
+<body>
+  <div class="card">
+    <h1>💰 ยอดของคุณ</h1>
+    <div class="subtitle">ค่าจ้างเดือนนี้ + รอบที่แล้ว</div>
+
+    <div id="error" class="error" style="display:none"></div>
+    <div id="loading" class="muted">กำลังโหลด...</div>
+
+    <div id="content" style="display:none">
+      <div class="label">เดือนนี้</div>
+      <div class="balance-total">
+        <div class="amount" id="month-total">—</div>
+        <div class="label" id="month-label">บาท</div>
+      </div>
+      <div class="balance-grid">
+        <div class="balance-item">
+          <div class="num" id="month-full">0</div>
+          <div class="label">วันเต็ม (400)</div>
+        </div>
+        <div class="balance-item">
+          <div class="num" id="month-half">0</div>
+          <div class="label">ครึ่งวัน (200)</div>
+        </div>
+      </div>
+
+      <div id="pending-row" style="display:none" class="note" id="pending-note"></div>
+
+      <h3 style="margin-top:24px;font-size:16px;color:#444;">รอบที่แล้ว</h3>
+      <div id="last-payment-empty" class="muted" style="font-size:14px;padding:12px 0">
+        ยังไม่มีรอบจ่าย
+      </div>
+      <div id="last-payment-row" class="payment-row" style="display:none">
+        <div>
+          <div id="last-period" style="font-weight:600">—</div>
+          <div class="meta" id="last-amount">—</div>
+        </div>
+        <div id="last-status" class="status">—</div>
+      </div>
+    </div>
+  </div>
+
+  <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <script type="module">
+    import { CONFIG } from './js/config.js';
+    import { initAuth, state } from './js/auth.js';
+    import { api } from './js/api.js';
+    import { showError } from './js/utils.js';
+
+    const errEl = document.getElementById('error');
+    const loadingEl = document.getElementById('loading');
+    const contentEl = document.getElementById('content');
+
+    async function boot() {
+      try {
+        await initAuth(CONFIG.LIFF_ID_BALANCE);
+        const result = await api.post('getBalance', { lineUserId: state.lineUserId });
+
+        document.getElementById('month-total').textContent = result.currentMonth.total.toLocaleString();
+        document.getElementById('month-full').textContent = result.currentMonth.full;
+        document.getElementById('month-half').textContent = result.currentMonth.half;
+
+        if (result.pendingDays > 0) {
+          const pn = document.getElementById('pending-row');
+          pn.style.display = 'block';
+          pn.textContent = '⏳ รออนุมัติ ' + result.pendingDays + ' วัน (ยังไม่นับในยอด)';
+        }
+
+        if (result.lastPayment) {
+          document.getElementById('last-payment-empty').style.display = 'none';
+          document.getElementById('last-payment-row').style.display = 'flex';
+          document.getElementById('last-period').textContent = 'รอบ ' + result.lastPayment.period;
+          document.getElementById('last-amount').textContent = result.lastPayment.total.toLocaleString() + ' บาท';
+          const statusEl = document.getElementById('last-status');
+          statusEl.textContent = result.lastPayment.status;
+          statusEl.className = 'status ' + result.lastPayment.status;
+        }
+
+        loadingEl.style.display = 'none';
+        contentEl.style.display = 'block';
+      } catch (e) {
+        loadingEl.style.display = 'none';
+        if (e.code === 'not_registered') {
+          showError(errEl, 'ยังไม่ได้ลงทะเบียน — กดเมนู "ลงทะเบียน" ก่อน');
+        } else {
+          showError(errEl, 'ผิดพลาด: ' + (e.message || e.code));
+        }
+      }
+    }
+
+    boot();
+  </script>
+</body>
+</html>

@@ -3,7 +3,7 @@
 body {
   font-family: -apple-system, "Helvetica Neue", "Sukhumvit Set", "Sarabun", sans-serif;
   margin: 0;
-  padding: 24px;
+  padding: 16px;
   background: #f5f5f5;
   color: #222;
   line-height: 1.5;
@@ -14,7 +14,7 @@ body {
   margin: 0 auto;
   background: #fff;
   border-radius: 14px;
-  padding: 24px;
+  padding: 20px;
   box-shadow: 0 2px 12px rgba(0,0,0,0.06);
 }
 
@@ -27,7 +27,7 @@ h1 {
 .subtitle {
   font-size: 14px;
   color: #666;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 
 .label {
@@ -39,26 +39,68 @@ h1 {
   font-weight: 600;
 }
 
+input[type="text"],
+input[type="tel"],
+input[type="number"],
+select {
+  width: 100%;
+  padding: 12px;
+  font-size: 16px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-family: inherit;
+  margin-bottom: 14px;
+}
+
+input[type="text"]:focus,
+input[type="tel"]:focus,
+input[type="number"]:focus,
+select:focus {
+  outline: none;
+  border-color: #06c755;
+}
+
+.field { margin-bottom: 14px; }
+.field .label { margin-bottom: 6px; }
+.field input, .field select { margin-bottom: 0; }
+
+.file-field {
+  margin-bottom: 14px;
+}
+.file-field input[type="file"] {
+  width: 100%;
+  padding: 10px;
+  font-size: 14px;
+  border: 1px dashed #aaa;
+  border-radius: 8px;
+  background: #fafafa;
+}
+.file-field .preview {
+  margin-top: 8px;
+  max-width: 200px;
+  max-height: 200px;
+  border-radius: 6px;
+  border: 1px solid #ddd;
+  display: block;
+}
+
 .userid-box {
   background: #f0f8f3;
   border: 1px solid #06c755;
   border-radius: 8px;
   padding: 14px 16px;
   font-family: "SF Mono", Menlo, Consolas, monospace;
-  font-size: 15px;
+  font-size: 14px;
   word-break: break-all;
   color: #222;
-  margin-bottom: 16px;
-  min-height: 50px;
-  display: flex;
-  align-items: center;
+  margin-bottom: 14px;
 }
 .userid-box.loading { color: #888; font-family: inherit; }
 
 .name-box {
   font-size: 16px;
   color: #444;
-  margin-bottom: 24px;
+  margin-bottom: 18px;
 }
 
 button {
@@ -80,9 +122,15 @@ button {
 .btn-primary.success { background: #888; }
 .btn-primary:disabled { background: #ccc; cursor: not-allowed; }
 
+.btn-secondary {
+  background: #f0f0f0;
+  color: #333;
+  margin-top: 10px;
+}
+
 .note {
-  margin-top: 24px;
-  padding: 14px;
+  margin-top: 20px;
+  padding: 12px;
   background: #fffbe6;
   border-left: 3px solid #fbbc04;
   border-radius: 4px;
@@ -97,6 +145,62 @@ button {
   color: #8b0000;
   padding: 12px;
   border-radius: 4px;
-  margin-bottom: 16px;
+  margin-bottom: 14px;
   font-size: 14px;
 }
+
+.success-banner {
+  background: #e8f5e9;
+  border-left: 3px solid #06c755;
+  color: #1b5e20;
+  padding: 14px;
+  border-radius: 4px;
+  margin-bottom: 14px;
+  font-size: 14px;
+}
+
+.muted { color: #888; }
+
+/* balance display */
+.balance-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.balance-item {
+  background: #f0f8f3;
+  border-radius: 8px;
+  padding: 14px;
+  text-align: center;
+}
+.balance-item .num { font-size: 28px; font-weight: 700; color: #06c755; }
+.balance-item .label { font-size: 12px; color: #666; margin-top: 4px; }
+
+.balance-total {
+  background: #06c755;
+  color: #fff;
+  border-radius: 8px;
+  padding: 18px;
+  text-align: center;
+  margin-bottom: 16px;
+}
+.balance-total .amount { font-size: 32px; font-weight: 700; }
+.balance-total .label { font-size: 13px; opacity: 0.9; margin-top: 4px; }
+
+.payment-row {
+  border-top: 1px solid #eee;
+  padding: 12px 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.payment-row .meta { color: #888; font-size: 13px; }
+.payment-row .status {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.status.รอจ่าย { background: #fff3e0; color: #e65100; }
+.status.จ่ายแล้ว { background: #e8f5e9; color: #1b5e20; }

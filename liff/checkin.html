@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>เช็คอิน — partime-checkin</title>
+  <link rel="stylesheet" href="./css/style.css" />
+</head>
+<body>
+  <div class="card">
+    <h1>📍 เช็คอินวันนี้</h1>
+    <div class="subtitle">ต้องอยู่ในรัศมีหน้างาน + ถ่าย selfie</div>
+
+    <div id="error" class="error" style="display:none"></div>
+    <div id="success" class="success-banner" style="display:none"></div>
+
+    <div class="label">ชื่อ</div>
+    <div id="name" class="name-box loading">กำลังโหลด...</div>
+
+    <div class="label">พิกัด GPS</div>
+    <div id="gps" class="userid-box loading">กำลังขอพิกัด...</div>
+
+    <div class="file-field">
+      <div class="label">selfie วันนี้</div>
+      <input type="file" id="selfie" accept="image/*" capture="user" />
+      <img id="selfie-preview" class="preview" style="display:none" />
+    </div>
+
+    <button id="btn-submit" class="btn-primary" disabled>เช็คอิน</button>
+    <button id="btn-retry-gps" class="btn-secondary" style="display:none">ขอพิกัด GPS อีกครั้ง</button>
+
+    <div class="note">
+      <strong>วิธี:</strong> เปิด GPS + อนุญาต location → เลือก/ถ่ายรูป selfie → กดเช็คอิน → รอเจ้าของอนุมัติ
+    </div>
+  </div>
+
+  <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <script type="module">
+    import { CONFIG } from './js/config.js';
+    import { initAuth, state } from './js/auth.js';
+    import { api } from './js/api.js';
+    import { fileToResizedBase64, getGeolocation, showError, clearError } from './js/utils.js';
+
+    const nameEl   = document.getElementById('name');
+    const gpsEl    = document.getElementById('gps');
+    const errEl    = document.getElementById('error');
+    const okEl     = document.getElementById('success');
+    const fileEl   = document.getElementById('selfie');
+    const btn      = document.getElementById('btn-submit');
+    const btnRetry = document.getElementById('btn-retry-gps');
+
+    let coords = null;
+
+    async function boot() {
+      try {
+        await initAuth(CONFIG.LIFF_ID_CHECKIN);
+      } catch (e) {
+        showError(errEl, 'LIFF init error: ' + e.message);
+        return;
+      }
+      nameEl.textContent = state.profile.displayName || '(ไม่มีชื่อ)';
+      nameEl.classList.remove('loading');
+      await fetchGps();
+    }
+
+    async function fetchGps() {
+      gpsEl.textContent = 'กำลังขอพิกัด...';
+      gpsEl.classList.add('loading');
+      btnRetry.style.display = 'none';
+      try {
+        coords = await getGeolocation();
+        gpsEl.textContent = coords.lat.toFixed(6) + ', ' + coords.lng.toFixed(6) + ' (±' + Math.round(coords.accuracy) + 'm)';
+        gpsEl.classList.remove('loading');
+        updateBtn();
+      } catch (e) {
+        coords = null;
+        showError(errEl, e.message + ' — กดอนุญาต location ใน LINE setting แล้วลองใหม่');
+        gpsEl.textContent = '—';
+        gpsEl.classList.remove('loading');
+        btnRetry.style.display = 'block';
+      }
+    }
+
+    btnRetry.addEventListener('click', fetchGps);
+
+    fileEl.addEventListener('change', async (e) => {
+      if (e.target.files[0]) {
+        const b64 = await fileToResizedBase64(e.target.files[0]);
+        document.getElementById('selfie-preview').src = b64;
+        document.getElementById('selfie-preview').style.display = 'block';
+      }
+      updateBtn();
+    });
+
+    function updateBtn() {
+      btn.disabled = !(coords && fileEl.files[0]);
+    }
+
+    btn.addEventListener('click', async () => {
+      clearError(errEl);
+      btn.disabled = true;
+      btn.textContent = 'กำลังส่ง...';
+      try {
+        const selfieBase64 = await fileToResizedBase64(fileEl.files[0]);
+        const result = await api.post('checkin', {
+          lineUserId:   state.lineUserId,
+          lat:          coords.lat,
+          lng:          coords.lng,
+          selfieBase64: selfieBase64,
+        });
+        okEl.style.display = 'block';
+        if (result.duplicated) {
+          okEl.textContent = '⏰ วันนี้เช็คอินไปแล้ว (' + result.checkinId + ')';
+        } else {
+          okEl.textContent = '✅ เช็คอินสำเร็จ — รออนุมัติจากเจ้าของ (' + result.checkinId + ')';
+        }
+        btn.textContent = 'ส่งสำเร็จ';
+      } catch (e) {
+        if (e.code === 'not_registered') {
+          showError(errEl, 'ยังไม่ได้ลงทะเบียน — กดเมนู "ลงทะเบียน" ก่อน');
+        } else if (e.code === 'inactive') {
+          showError(errEl, 'บัญชีถูกระงับ — ติดต่อเจ้าของ');
+        } else if (e.code === 'out_of_range') {
+          showError(errEl, 'อยู่นอกรัศมี — ห่าง ' + e.data.distanceM + ' เมตร');
+        } else if (e.code === 'upload_failed') {
+          showError(errEl, 'อัพรูปไม่สำเร็จ: ' + (e.data.detail || ''));
+        } else {
+          showError(errEl, 'ผิดพลาด: ' + (e.message || e.code));
+        }
+        btn.disabled = false;
+        btn.textContent = 'เช็คอิน';
+      }
+    });
+
+    boot();
+  </script>
+</body>
+</html>
