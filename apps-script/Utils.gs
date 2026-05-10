@@ -125,6 +125,17 @@ function getSlotLabel(cfg, slot) {
   return cfg['slot' + slot + '_label'] || fallback[slot] || ('slot ' + slot);
 }
 
+/** format วันที่+เวลาเป็นไทยอ่านง่าย: "10 พ.ค. 2026 เวลา 17:05 น." */
+function formatThaiDateTime(d) {
+  d = d || new Date();
+  const months = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  const day = Utilities.formatDate(d, 'Asia/Bangkok', 'd');
+  const monthIdx = Number(Utilities.formatDate(d, 'Asia/Bangkok', 'M')) - 1;
+  const year = Utilities.formatDate(d, 'Asia/Bangkok', 'yyyy');
+  const time = Utilities.formatDate(d, 'Asia/Bangkok', 'HH:mm');
+  return day + ' ' + months[monthIdx] + ' ' + year + ' เวลา ' + time + ' น.';
+}
+
 /** หา employee จาก line_user_id — return row object หรือ null */
 function findEmployeeByLineUserId(lineUserId) {
   const sheetId = PropertiesService.getScriptProperties().getProperty('SHEET_ID');

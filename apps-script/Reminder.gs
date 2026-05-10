@@ -203,27 +203,49 @@ function sendSlotReminder_(cfg, slot, today, round) {
   logInfo('sendSlotReminder', 'slot=' + slot + ' round=' + round + ' sent=' + sent, '');
 }
 
-/** broadcast เลิกงาน — push flex card สีเหลืองหา active employees (ยกเว้น owner) */
+/** broadcast เลิกงาน — push flex card สีเหลืองหา active employees ที่ยังไม่สแกน slot 4 (ยกเว้น owner) */
 function sendEndOfWorkBroadcast_() {
   const sheetId = PropertiesService.getScriptProperties().getProperty('SHEET_ID');
-  const empSh = SpreadsheetApp.openById(sheetId).getSheetByName('Employees');
+  const ss = SpreadsheetApp.openById(sheetId);
+  const empSh = ss.getSheetByName('Employees');
+  const checkSh = ss.getSheetByName('Checkins');
   if (empSh.getLastRow() < 2) return;
+  const today = todayBangkok();
+
+  // คนที่สแกน slot 4 แล้ววันนี้ — skip
+  const scannedSlot4 = {};
+  if (checkSh.getLastRow() >= 2) {
+    const ch = checkSh.getRange(1, 1, 1, checkSh.getLastColumn()).getValues()[0];
+    const cd = checkSh.getRange(2, 1, checkSh.getLastRow() - 1, checkSh.getLastColumn()).getValues();
+    const iEmp = ch.indexOf('employee_id');
+    const iDate = ch.indexOf('checkin_date');
+    const iSlot4 = ch.indexOf('slot4_at');
+    cd.forEach(function (row) {
+      const d = row[iDate];
+      const dStr = (d instanceof Date)
+        ? Utilities.formatDate(d, 'Asia/Bangkok', 'yyyy-MM-dd')
+        : String(d);
+      if (dStr === today && row[iSlot4]) scannedSlot4[row[iEmp]] = true;
+    });
+  }
+
   const eh = empSh.getRange(1, 1, 1, empSh.getLastColumn()).getValues()[0];
   const ed = empSh.getRange(2, 1, empSh.getLastRow() - 1, empSh.getLastColumn()).getValues();
+  const iId = eh.indexOf('employee_id');
+  const iName = eh.indexOf('display_name');
   const iLine = eh.indexOf('line_user_id');
   const iActive = eh.indexOf('is_active');
 
-  const card = buildEndOfWorkCard();
-
   let sent = 0;
   ed.forEach(function (row) {
-    if (row[iActive] === true || String(row[iActive]).toLowerCase() === 'true') {
-      const uid = row[iLine];
-      if (!uid) return;
-      if (isOwner(uid)) return;  // ห้ามส่งหา owner
-      pushMessage(uid, [card]);
-      sent++;
-    }
+    if (row[iActive] !== true && String(row[iActive]).toLowerCase() !== 'true') return;
+    const uid = row[iLine];
+    if (!uid) return;
+    if (isOwner(uid)) return;
+    if (scannedSlot4[row[iId]]) return;  // สแกน slot 4 แล้ว = ไม่เตือนซ้ำ
+    const card = buildEndOfWorkCard(row[iName]);
+    pushMessage(uid, [card]);
+    sent++;
   });
   logInfo('sendEndOfWorkBroadcast', 'sent=' + sent, '');
 }

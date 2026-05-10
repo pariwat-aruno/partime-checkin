@@ -234,6 +234,7 @@ function buildRegistrationCard(args) {
 function buildScanReminderCard(employeeName, slotLabel, isLast) {
   const liffId = PropertiesService.getScriptProperties().getProperty('LIFF_ID_CHECKIN');
   const liffUrl = 'https://liff.line.me/' + liffId;
+  const nowText = formatThaiDateTime();
 
   const headerBg = isLast ? CHERRY_DARK : CHERRY;
   const headerLabel = isLast ? '⚠️  แจ้งเตือนครั้งสุดท้าย' : 'แจ้งเตือนสแกนหน้า';
@@ -260,7 +261,9 @@ function buildScanReminderCard(employeeName, slotLabel, isLast) {
       body: {
         type: 'box', layout: 'vertical', spacing: 'sm',
         contents: [
-          { type: 'text', text: 'ถึง คุณ ' + employeeName, color: TEXT, size: 'sm', wrap: true },
+          { type: 'text', text: nowText, color: MUTED, size: 'xs', align: 'end' },
+          { type: 'separator', margin: 'sm' },
+          { type: 'text', text: 'ถึง คุณ ' + employeeName, color: TEXT, size: 'sm', wrap: true, margin: 'md' },
           { type: 'text', text: 'กรุณาสแกนหน้าในรอบ', color: MUTED, size: 'sm', margin: 'md' },
           {
             type: 'box', layout: 'vertical',
@@ -286,7 +289,8 @@ function buildScanReminderCard(employeeName, slotLabel, isLast) {
 /**
  * Card สำหรับเตือนเลิกงาน 17:00 — สีเหลืองเตือนชัดเจน + ! emoji
  */
-function buildEndOfWorkCard() {
+function buildEndOfWorkCard(employeeName) {
+  const nowText = formatThaiDateTime();
   return {
     type: 'flex',
     altText: BRAND + ' — ⚠️ ถึงเวลาเลิกงาน — ออกจากออฟิศทันที',
@@ -314,14 +318,17 @@ function buildEndOfWorkCard() {
         backgroundColor: WARNING_BG,
         paddingAll: '18px',
         contents: [
+          { type: 'text', text: nowText, color: '#7a5d00', size: 'xs', align: 'end' },
+          { type: 'separator', margin: 'sm', color: AMBER },
+          (employeeName
+            ? { type: 'text', text: 'ถึง คุณ ' + employeeName, color: TEXT, size: 'sm', wrap: true, margin: 'md' }
+            : { type: 'filler' }),
           {
-            type: 'text',
-            text: 'ถึงเวลาเลิกงานแล้ว',
-            color: WARNING, weight: 'bold', size: 'lg', align: 'center', wrap: true,
+            type: 'text', text: 'ถึงเวลาเลิกงานแล้ว',
+            color: WARNING, weight: 'bold', size: 'lg', align: 'center', wrap: true, margin: 'md',
           },
           {
-            type: 'text',
-            text: 'ให้ออกจากออฟิศทันที',
+            type: 'text', text: 'ให้ออกจากออฟิศทันที',
             color: TEXT, weight: 'bold', size: 'md', align: 'center', wrap: true, margin: 'sm',
           },
           { type: 'separator', margin: 'lg', color: AMBER },
@@ -329,10 +336,7 @@ function buildEndOfWorkCard() {
             type: 'box', layout: 'vertical', margin: 'lg',
             paddingAll: '12px', backgroundColor: '#ffffff', cornerRadius: '6px',
             contents: [
-              {
-                type: 'text', text: '⚠️  คำเตือนสำคัญ',
-                color: WARNING, weight: 'bold', size: 'sm',
-              },
+              { type: 'text', text: '⚠️  คำเตือนสำคัญ', color: WARNING, weight: 'bold', size: 'sm' },
               {
                 type: 'text',
                 text: 'หากไม่ได้รับอนุญาตให้ทำงานล่วงเวลา บริษัทฯ จะไม่รับผิดชอบค่าล่วงเวลาทุกกรณี',
