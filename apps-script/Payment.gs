@@ -26,11 +26,12 @@ function closePeriod(payload) {
 
   // ถ้ามี pending → return warning ไม่สร้างแถว (เจ้าของต้อง confirm รอบสอง)
   if (stats.pending > 0 && !payload.confirm) {
-    const cfg = getConfig();
-    pushText(cfg.OWNER_LINE_USER_ID,
-      'เตือนปิดยอด — ' + emp.display_name + ' (' + emp.employee_id + ')\n' +
-      'ยังมี ' + stats.pending + ' วันที่รออนุมัติ\n' +
-      'ถ้าจะปิดเลย ส่ง action ใหม่พร้อม confirm=true');
+    pushToAllOwners([{
+      type: 'text',
+      text: 'เตือนปิดยอด — ' + emp.display_name + ' (' + emp.employee_id + ')\n' +
+        'ยังมี ' + stats.pending + ' วันที่รออนุมัติ\n' +
+        'ถ้าจะปิดเลย ส่ง action ใหม่พร้อม confirm=true'
+    }]);
     return { ok: false, error: 'has_pending', pending: stats.pending };
   }
 
@@ -53,14 +54,15 @@ function closePeriod(payload) {
 
   logInfo('closePeriod', 'created payment', { paymentId: paymentId, employeeId: emp.employee_id, total: stats.total });
 
-  // push สรุปหาเจ้าของ
-  const cfg = getConfig();
-  pushText(cfg.OWNER_LINE_USER_ID,
-    '✅ ปิดยอดสำเร็จ\n' +
-    emp.display_name + ' (' + emp.employee_id + ')\n' +
-    'รอบ ' + period + '\n' +
-    stats.full + ' วันเต็ม + ' + stats.half + ' วันครึ่ง = ' + stats.total + ' บาท\n' +
-    'สถานะ: รอจ่าย');
+  // push สรุปหาเจ้าของทุกคน
+  pushToAllOwners([{
+    type: 'text',
+    text: '✅ ปิดยอดสำเร็จ\n' +
+      emp.display_name + ' (' + emp.employee_id + ')\n' +
+      'รอบ ' + period + '\n' +
+      stats.full + ' วันเต็ม + ' + stats.half + ' วันครึ่ง = ' + stats.total + ' บาท\n' +
+      'สถานะ: รอจ่าย'
+  }]);
 
   return {
     ok: true,

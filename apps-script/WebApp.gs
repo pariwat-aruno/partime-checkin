@@ -116,8 +116,7 @@ function handleMessageEvent_(ev) {
  */
 function replyPendingApprovals_(ev) {
   const userId = ev.source && ev.source.userId;
-  const ownerUserId = PropertiesService.getScriptProperties().getProperty('OWNER_LINE_USER_ID');
-  if (userId !== ownerUserId) {
+  if (!isOwner(userId)) {
     return replyText(ev.replyToken, 'เฉพาะเจ้าของเท่านั้นที่ดูรายการรออนุมัติได้');
   }
 
@@ -237,8 +236,7 @@ function listPendingCheckins_() {
  */
 function handlePostback_(ev) {
   const userId = ev.source && ev.source.userId;
-  const ownerUserId = PropertiesService.getScriptProperties().getProperty('OWNER_LINE_USER_ID');
-  if (userId !== ownerUserId) {
+  if (!isOwner(userId)) {
     logWarn('postback', 'unauthorized user', { userId: userId });
     return replyText(ev.replyToken, 'คุณไม่มีสิทธิ์อนุมัติ — เฉพาะเจ้าของเท่านั้น');
   }

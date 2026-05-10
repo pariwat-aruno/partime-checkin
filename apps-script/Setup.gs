@@ -145,13 +145,15 @@ function ensureSheetWithHeaders_(ss, name, headers) {
 // TASK-02 — seed ค่าเริ่มต้นใน sheet Config
 // ========================================================================
 
-// ค่า default ของระบบ — แก้ตรงนี้ถ้าจะเปลี่ยนค่าจ้าง/พิกัด/รัศมี
+// ค่า default ของระบบ — แก้ตรงนี้ถ้าจะเปลี่ยนค่าจ้าง/พิกัด/รัศมี/owners
 const CONFIG_DEFAULTS = {
   wage_full_day: 400,
   wage_half_day: 200,
   geofence_lat: 18.82895270346188,
   geofence_lng: 99.01300963558201,
   geofence_radius_m: 100,
+  // owner_line_user_ids: comma-separated เช่น 'U1234,U5678' (เพิ่ม owner ใหม่ที่นี่)
+  owner_line_user_ids: 'U4b33c5ea9673d07f3e275efaa4db02a2',
 };
 
 /**

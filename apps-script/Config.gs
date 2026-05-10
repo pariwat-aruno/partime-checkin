@@ -22,7 +22,6 @@ function getConfig() {
     'SHEET_ID',
     'DRIVE_FOLDER_ID',
     'LINE_CHANNEL_ACCESS_TOKEN',
-    'OWNER_LINE_USER_ID',
     'LIFF_ID_REGISTER',
     'LIFF_ID_CHECKIN',
     'LIFF_ID_BALANCE',
@@ -46,10 +45,49 @@ function getConfig() {
   cfg.DRIVE_FOLDER_ID_CARDS = props.getProperty('DRIVE_FOLDER_ID_CARDS') || '';
   cfg.DRIVE_FOLDER_DAILY_CHECKINS = props.getProperty('DRIVE_FOLDER_DAILY_CHECKINS') || '';
 
-  // sheet `Config`
+  // sheet `Config` — wage, geofence, owner_line_user_ids
   Object.assign(cfg, readSheetConfig_(cfg.SHEET_ID));
 
+  // owners — รองรับหลายคน
+  // 1. ถ้ามี owner_line_user_ids ใน Sheet Config → ใช้ตัวนั้น (split ด้วย comma)
+  // 2. ถ้าไม่มี → fall back ไปอ่าน OWNER_LINE_USER_ID จาก Script Properties (backward compat)
+  let ownerIds = [];
+  if (cfg.owner_line_user_ids) {
+    ownerIds = String(cfg.owner_line_user_ids)
+      .split(',')
+      .map(function (s) { return s.trim(); })
+      .filter(function (s) { return s.length > 0; });
+  } else {
+    const single = props.getProperty('OWNER_LINE_USER_ID');
+    if (single) ownerIds = [single];
+  }
+  if (ownerIds.length === 0) {
+    throw new Error('ไม่มี owner: เพิ่ม row owner_line_user_ids ใน sheet Config (comma-separated) หรือ Script Properties OWNER_LINE_USER_ID');
+  }
+  cfg.OWNER_LINE_USER_IDS = ownerIds;
+  // backward compat — code เก่าที่ยังอ้างถึง OWNER_LINE_USER_ID = ตัวแรก
+  cfg.OWNER_LINE_USER_ID = ownerIds[0];
+
   return cfg;
+}
+
+/** เช็คว่า userId เป็น owner คนใดคนหนึ่งไหม */
+function isOwner(userId) {
+  if (!userId) return false;
+  try {
+    const cfg = getConfig();
+    return cfg.OWNER_LINE_USER_IDS.indexOf(userId) >= 0;
+  } catch (e) {
+    return false;
+  }
+}
+
+/** push message ให้ owner ทุกคน */
+function pushToAllOwners(messages) {
+  const cfg = getConfig();
+  cfg.OWNER_LINE_USER_IDS.forEach(function (uid) {
+    pushMessage(uid, messages);
+  });
 }
 
 /**
@@ -80,7 +118,7 @@ function readSheetConfig_(sheetId) {
     });
   }
 
-  // validate required
+  // validate required (owner_line_user_ids optional — fall back ไป Script Properties)
   const need = ['wage_full_day', 'wage_half_day', 'geofence_lat', 'geofence_lng', 'geofence_radius_m'];
   const miss = need.filter(function (k) { return result[k] == null; });
   if (miss.length) {

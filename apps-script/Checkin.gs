@@ -92,7 +92,7 @@ function checkin(payload) {
       radiusM: Number(cfg.geofence_radius_m),
       outOfRange: outOfRange,
     });
-    pushMessage(cfg.OWNER_LINE_USER_ID, [card]);
+    pushToAllOwners([card]);
   } catch (err) {
     logError('checkin', 'push flex failed: ' + err.message, { checkinId: checkinId });
   }
