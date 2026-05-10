@@ -29,15 +29,14 @@ LOGO_PATH = os.path.join(os.path.dirname(__file__), "..", "liff", "img", "logo.j
 # ขนาดมาตรฐาน rich menu (LINE บังคับ 2500x843 หรือ 2500x1686)
 WIDTH = 2500
 HEIGHT = 843
-SECTION_W = WIDTH // 3  # 833
 
 # cherry red palette — บริษัท วอร์ด้า กินแคร์
-# 3 sections — ใช้ cherry shades ไล่จากเข้มไปอ่อน
+# 2 sections (ลงทะเบียนใช้ bot command "ลงทะเบียน" แทน — ใช้ไม่บ่อย)
 SECTIONS = [
-    {"label": "ลงทะเบียน", "color": (200, 16,  46), "liff": LIFF_REGISTER},   # cherry primary
-    {"label": "เช็คอิน",   "color": (154, 12,  36), "liff": LIFF_CHECKIN},    # cherry darker
-    {"label": "ดูยอด",     "color": (110,  8,  24), "liff": LIFF_BALANCE},    # cherry deepest
+    {"label": "เช็คอิน",   "color": (200, 16,  46), "liff": LIFF_CHECKIN},
+    {"label": "ดูยอด",     "color": (154, 12,  36), "liff": LIFF_BALANCE},
 ]
+SECTION_W = WIDTH // len(SECTIONS)  # auto: 2 sections = 1250 each
 BRAND_TEXT = "บริษัท วอร์ด้า กินแคร์"
 
 THAI_FONT_PATHS = [

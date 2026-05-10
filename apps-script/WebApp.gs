@@ -81,8 +81,9 @@ function handleLineEvent_(ev) {
   if (ev.type === 'follow') {
     return replyText(ev.replyToken,
       'ยินดีต้อนรับสู่ บริษัท วอร์ด้า กินแคร์\n\n' +
-      '- กดเมนู "ลงทะเบียน" เพื่อสมัครครั้งแรก\n' +
-      '- หรือพิมพ์ "id" เพื่อรับ LINE User ID ของคุณ');
+      '- พิมพ์ "ลงทะเบียน" เพื่อสมัครครั้งแรก\n' +
+      '- กดเมนู "เช็คอิน" เมื่อถึงร้าน\n' +
+      '- กดเมนู "ดูยอด" เพื่อดูค่าจ้าง');
   }
 }
 
@@ -104,6 +105,17 @@ function handleMessageEvent_(ev) {
       'บริษัท วอร์ด้า กินแคร์');
   }
 
+  // command "ลงทะเบียน" / "register" / "สมัคร" → ตอบลิงก์ LIFF (ไม่ผูก rich menu แล้ว)
+  if (lower === 'ลงทะเบียน' || lower === 'register' || lower === 'สมัคร') {
+    const props = PropertiesService.getScriptProperties();
+    const liffId = props.getProperty('LIFF_ID_REGISTER');
+    return replyText(ev.replyToken,
+      'ลงทะเบียนพาร์ทไทม์ใหม่\n\n' +
+      'กดที่ลิงก์นี้:\n' +
+      'https://liff.line.me/' + liffId + '\n\n' +
+      'บริษัท วอร์ด้า กินแคร์');
+  }
+
   const lower = text.toLowerCase();
   if (lower === 'รอ' || lower === 'pending' || lower === 'รออนุมัติ') {
     return replyPendingApprovals_(ev);
@@ -116,10 +128,12 @@ function handleMessageEvent_(ev) {
   }
 
   return replyText(ev.replyToken,
-    'พิมพ์ "id" รับ LINE User ID\n' +
-    'พิมพ์ "รอ" ดูรายการรออนุมัติ (เจ้าของ)\n' +
-    'พิมพ์ "รายงาน" หรือ "รายงาน 2026-05-10" ดูสรุปวัน (เจ้าของ)\n' +
-    'หรือใช้เมนูด้านล่าง: ลงทะเบียน / เช็คอิน / ดูยอด\n\n' +
+    'คำสั่งที่ใช้ได้:\n' +
+    '"ลงทะเบียน" — สมัครครั้งแรก (ลิงก์)\n' +
+    '"id" — รับ LINE User ID\n' +
+    '"รอ" — รายการรออนุมัติ (เจ้าของ)\n' +
+    '"รายงาน" หรือ "รายงาน 2026-05-10" — สรุปวัน (เจ้าของ)\n\n' +
+    'หรือใช้เมนูด้านล่าง: เช็คอิน / ดูยอด\n\n' +
     'บริษัท วอร์ด้า กินแคร์');
 }
 
