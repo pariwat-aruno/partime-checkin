@@ -5,11 +5,51 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>ลงทะเบียน — partime-checkin</title>
   <link rel="stylesheet" href="./css/style.css" />
+  <style>
+    .photo-section {
+      border: 1px solid #ddd; border-radius: 10px; padding: 12px;
+      margin-bottom: 14px;
+    }
+    .photo-section .label { margin-bottom: 8px; }
+    .photo-thumb {
+      width: 100%; aspect-ratio: 4/3; object-fit: cover;
+      border-radius: 8px; background: #f0f0f0; display: block;
+      margin-bottom: 8px;
+    }
+    .photo-thumb.empty {
+      display: flex; align-items: center; justify-content: center;
+      color: #999; font-size: 13px;
+    }
+    .photo-section button { width: 100%; padding: 10px; font-size: 14px; }
+
+    /* Modal กล้อง */
+    #cam-modal {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.95);
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; z-index: 9999; padding: 16px;
+    }
+    #cam-video {
+      width: 100%; max-width: 480px; aspect-ratio: 1/1;
+      object-fit: cover; background: #000; border-radius: 12px;
+      margin-bottom: 14px;
+    }
+    .cam-buttons {
+      width: 100%; max-width: 480px;
+      display: flex; gap: 10px;
+    }
+    .cam-buttons button { flex: 1; padding: 14px; font-size: 16px; }
+    #cam-title {
+      color: #fff; margin-bottom: 10px; font-size: 16px;
+    }
+    #cam-error {
+      color: #ff8a80; margin-bottom: 10px; text-align: center; font-size: 13px;
+    }
+  </style>
 </head>
 <body>
   <div class="card">
     <h1>📝 ลงทะเบียนพาร์ทไทม์</h1>
-    <div class="subtitle">กรอกข้อมูลครั้งเดียว ใช้ได้ตลอด</div>
+    <div class="subtitle">กรอกข้อมูล + ถ่ายรูปสด 2 ใบ — ห้ามเลือกรูปเดิม</div>
 
     <div id="error" class="error" style="display:none"></div>
     <div id="success" class="success-banner" style="display:none"></div>
@@ -52,23 +92,36 @@
         <input type="text" name="bankAccountName" required maxlength="80" />
       </div>
 
-      <div class="file-field">
-        <div class="label">รูป selfie (ใช้กล้องหน้าถ่ายตัวเอง)</div>
-        <input type="file" name="selfie" accept="image/*" capture="user" required />
-        <img id="selfie-preview" class="preview" style="display:none" />
+      <div class="photo-section">
+        <div class="label">รูป selfie (กล้องหน้า)</div>
+        <img id="selfie-thumb" class="photo-thumb empty" alt="ยังไม่ถ่าย" />
+        <div id="selfie-placeholder" class="photo-thumb empty" style="display:flex">ยังไม่ถ่าย — กดปุ่มด้านล่าง</div>
+        <button type="button" id="btn-cam-selfie" class="btn-primary">📷 ถ่าย selfie</button>
       </div>
 
-      <div class="file-field">
-        <div class="label">รูปบัตรประชาชน</div>
-        <input type="file" name="idCard" accept="image/*" capture="environment" required />
-        <img id="idcard-preview" class="preview" style="display:none" />
+      <div class="photo-section">
+        <div class="label">รูปบัตรประชาชน (กล้องหลัง)</div>
+        <img id="idcard-thumb" class="photo-thumb empty" alt="ยังไม่ถ่าย" />
+        <div id="idcard-placeholder" class="photo-thumb empty" style="display:flex">ยังไม่ถ่าย — กดปุ่มด้านล่าง</div>
+        <button type="button" id="btn-cam-idcard" class="btn-primary">📷 ถ่ายบัตรประชาชน</button>
       </div>
 
-      <button type="submit" id="btn-submit" class="btn-primary">ลงทะเบียน</button>
+      <button type="submit" id="btn-submit" class="btn-primary" disabled style="margin-top:10px">ลงทะเบียน</button>
     </form>
 
     <div class="note">
-      <strong>หมายเหตุ:</strong> รูป selfie ใช้เทียบกับวันเช็คอิน — ขอให้ชัดเจน เห็นหน้าทั้งใบ
+      <strong>หมายเหตุ:</strong> ทุกรูปบังคับถ่ายสด ไม่มี option เลือกจาก gallery — กันการใช้รูปคนอื่น
+    </div>
+  </div>
+
+  <!-- Camera modal -->
+  <div id="cam-modal" hidden>
+    <div id="cam-title">ถ่ายภาพ</div>
+    <div id="cam-error"></div>
+    <video id="cam-video" autoplay muted playsinline></video>
+    <div class="cam-buttons">
+      <button id="cam-cancel" class="btn-secondary" style="background:#666;color:#fff">ยกเลิก</button>
+      <button id="cam-capture" class="btn-primary">📷 ถ่าย</button>
     </div>
   </div>
 
@@ -77,7 +130,8 @@
     import { CONFIG } from './js/config.js';
     import { initAuth, state } from './js/auth.js';
     import { api } from './js/api.js';
-    import { fileToResizedBase64, showError, clearError } from './js/utils.js';
+    import { showError, clearError } from './js/utils.js';
+    import { startCamera, captureFromVideo, stopCamera } from './js/camera.js';
 
     const useridEl = document.getElementById('userid');
     const errEl    = document.getElementById('error');
@@ -85,51 +139,108 @@
     const form     = document.getElementById('form');
     const btn      = document.getElementById('btn-submit');
 
+    const selfieThumb = document.getElementById('selfie-thumb');
+    const selfiePlaceholder = document.getElementById('selfie-placeholder');
+    const idcardThumb = document.getElementById('idcard-thumb');
+    const idcardPlaceholder = document.getElementById('idcard-placeholder');
+
+    let selfieBase64 = null;
+    let idCardBase64 = null;
+
+    // ===== Camera modal =====
+    const camModal = document.getElementById('cam-modal');
+    const camVideo = document.getElementById('cam-video');
+    const camTitle = document.getElementById('cam-title');
+    const camError = document.getElementById('cam-error');
+    const camCapture = document.getElementById('cam-capture');
+    const camCancel = document.getElementById('cam-cancel');
+    let camStream = null;
+    let camResolve = null;
+
+    async function openCameraModal(title, facing) {
+      camTitle.textContent = title;
+      camError.textContent = '';
+      camModal.hidden = false;
+      try {
+        camStream = await startCamera(camVideo, facing);
+        camCapture.disabled = false;
+      } catch (e) {
+        camError.textContent = 'กล้องไม่พร้อม: ' + (e.message || '') + '\nอนุญาต permission กล้องใน LINE/iOS Settings';
+        camCapture.disabled = true;
+      }
+      return new Promise(res => { camResolve = res; });
+    }
+    function closeCameraModal(result) {
+      stopCamera(camStream); camStream = null;
+      camModal.hidden = true;
+      if (camResolve) { camResolve(result); camResolve = null; }
+    }
+    camCapture.addEventListener('click', () => {
+      try {
+        const b64 = captureFromVideo(camVideo);
+        closeCameraModal(b64);
+      } catch (e) {
+        camError.textContent = e.message;
+      }
+    });
+    camCancel.addEventListener('click', () => closeCameraModal(null));
+
+    // ===== Init LIFF =====
     async function boot() {
       try {
         await initAuth(CONFIG.LIFF_ID_REGISTER);
       } catch (e) {
-        showError(errEl, 'LIFF init error: ' + e.message);
+        showError(errEl, 'LIFF init: ' + e.message);
         return;
       }
       useridEl.textContent = state.lineUserId;
       useridEl.classList.remove('loading');
-      // auto-fill display name
       if (state.profile && state.profile.displayName) {
         form.displayName.value = state.profile.displayName;
       }
       form.style.display = 'block';
     }
 
-    // preview รูปหลังเลือก
-    form.selfie.addEventListener('change', async (e) => {
-      if (e.target.files[0]) {
-        const b64 = await fileToResizedBase64(e.target.files[0]);
-        document.getElementById('selfie-preview').src = b64;
-        document.getElementById('selfie-preview').style.display = 'block';
+    function updateSubmitBtn() {
+      btn.disabled = !(selfieBase64 && idCardBase64);
+    }
+
+    document.getElementById('btn-cam-selfie').addEventListener('click', async () => {
+      const b64 = await openCameraModal('ถ่าย selfie', 'user');
+      if (b64) {
+        selfieBase64 = b64;
+        selfieThumb.src = b64;
+        selfieThumb.style.display = 'block';
+        selfieThumb.classList.remove('empty');
+        selfiePlaceholder.style.display = 'none';
+        document.getElementById('btn-cam-selfie').textContent = '📷 ถ่ายใหม่';
+        updateSubmitBtn();
       }
     });
-    form.idCard.addEventListener('change', async (e) => {
-      if (e.target.files[0]) {
-        const b64 = await fileToResizedBase64(e.target.files[0]);
-        document.getElementById('idcard-preview').src = b64;
-        document.getElementById('idcard-preview').style.display = 'block';
+
+    document.getElementById('btn-cam-idcard').addEventListener('click', async () => {
+      const b64 = await openCameraModal('ถ่ายบัตรประชาชน', 'environment');
+      if (b64) {
+        idCardBase64 = b64;
+        idcardThumb.src = b64;
+        idcardThumb.style.display = 'block';
+        idcardThumb.classList.remove('empty');
+        idcardPlaceholder.style.display = 'none';
+        document.getElementById('btn-cam-idcard').textContent = '📷 ถ่ายใหม่';
+        updateSubmitBtn();
       }
     });
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       clearError(errEl);
+      if (!selfieBase64 || !idCardBase64) {
+        showError(errEl, 'กรุณาถ่ายรูป selfie + บัตรประชาชนให้ครบ');
+        return;
+      }
       btn.disabled = true;
       btn.textContent = 'กำลังส่ง...';
-
       try {
-        if (!form.selfie.files[0] || !form.idCard.files[0]) {
-          throw new Error('กรุณาเลือกรูปทั้ง 2 ใบ');
-        }
-        const selfieBase64 = await fileToResizedBase64(form.selfie.files[0]);
-        const idCardBase64 = await fileToResizedBase64(form.idCard.files[0]);
-
         const result = await api.post('register', {
           lineUserId:      state.lineUserId,
           displayName:     form.displayName.value.trim(),
@@ -140,7 +251,6 @@
           selfieBase64:    selfieBase64,
           idCardBase64:    idCardBase64,
         });
-
         okEl.style.display = 'block';
         okEl.textContent = '✅ ลงทะเบียนเรียบร้อย — ' + result.employeeId;
         form.style.display = 'none';
@@ -148,7 +258,7 @@
         if (e.code === 'already_registered') {
           showError(errEl, 'คุณลงทะเบียนแล้ว — กดเมนู "เช็คอิน" ได้เลย');
         } else if (e.code === 'upload_failed') {
-          showError(errEl, 'อัพรูปไม่สำเร็จ ลองใหม่: ' + (e.data.detail || ''));
+          showError(errEl, 'อัพรูปไม่สำเร็จ ลองใหม่: ' + (e.data?.detail || ''));
         } else {
           showError(errEl, 'ผิดพลาด: ' + (e.message || e.code));
         }

@@ -50,12 +50,15 @@ function doPost(e) {
 /** route LIFF action → handler */
 function routeAction_(action, payload) {
   switch (action) {
-    case 'register':       return register(payload);
-    case 'checkin':        return checkin(payload);
-    case 'getBalance':     return getBalance(payload);
-    case 'getTodayStatus': return getTodayStatus(payload);
-    case 'getDailyReport': return getDailyReport(payload);
-    case 'closePeriod':    return closePeriod(payload);
+    case 'register':           return register(payload);
+    case 'checkin':            return checkin(payload);
+    case 'getBalance':         return getBalance(payload);
+    case 'getTodayStatus':     return getTodayStatus(payload);
+    case 'getDailyReport':     return getDailyReport(payload);
+    // admin (owner only — verify ใน handler)
+    case 'getOwnerDashboard':  return getOwnerDashboard(payload);
+    case 'closePeriod':        return closePeriod(payload);
+    case 'markPaid':           return markPaid(payload);
     default:
       return { ok: false, error: 'unknown_action', action: action };
   }

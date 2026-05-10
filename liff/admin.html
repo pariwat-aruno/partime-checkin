@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Admin — partime-checkin</title>
+  <link rel="stylesheet" href="./css/style.css" />
+  <style>
+    .period-picker {
+      display: flex; gap: 8px; margin-bottom: 16px;
+    }
+    .period-picker input[type="month"] {
+      flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 8px;
+      font-size: 16px; font-family: inherit; margin: 0;
+    }
+    .period-picker button {
+      width: auto; padding: 10px 14px; flex: 0 0 auto;
+    }
+
+    .emp-row {
+      border: 1px solid #eee; border-radius: 10px; padding: 14px;
+      margin-bottom: 10px; background: #fff;
+    }
+    .emp-row .emp-head {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 8px;
+    }
+    .emp-row .emp-name { font-weight: 700; font-size: 15px; }
+    .emp-row .emp-id   { color: #888; font-size: 12px; }
+
+    .emp-stats {
+      display: grid; grid-template-columns: repeat(4, 1fr);
+      gap: 6px; margin-bottom: 10px; font-size: 12px;
+    }
+    .emp-stats .item {
+      background: #f8f8f8; border-radius: 6px; padding: 6px; text-align: center;
+    }
+    .emp-stats .item .num   { font-weight: 700; font-size: 16px; color: #06c755; }
+    .emp-stats .item .label { color: #888; }
+    .emp-stats .item.pending .num { color: #e65100; }
+    .emp-stats .item.total   .num { color: #1565c0; }
+
+    .emp-actions { display: flex; gap: 6px; }
+    .emp-actions button { flex: 1; padding: 10px; font-size: 14px; }
+
+    .pay-status {
+      padding: 6px 10px; border-radius: 12px; font-size: 12px;
+      font-weight: 600; display: inline-block;
+    }
+    .pay-status.รอจ่าย { background: #fff3e0; color: #e65100; }
+    .pay-status.จ่ายแล้ว { background: #e8f5e9; color: #1b5e20; }
+    .pay-info {
+      font-size: 12px; color: #666; margin-bottom: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>👔 Admin — ปิดยอด</h1>
+    <div class="subtitle">เฉพาะเจ้าของ — สรุปยอด + ปิดยอด + ทำเครื่องหมายจ่ายแล้ว</div>
+
+    <div id="error" class="error" style="display:none"></div>
+    <div id="loading" class="muted">กำลังโหลด...</div>
+
+    <div id="content" style="display:none">
+      <div class="period-picker">
+        <input type="month" id="period" />
+        <button id="btn-refresh" class="btn-primary">โหลด</button>
+      </div>
+      <div id="emp-list"></div>
+    </div>
+  </div>
+
+  <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <script type="module">
+    import { CONFIG } from './js/config.js';
+    import { initAuth, state } from './js/auth.js';
+    import { api } from './js/api.js';
+    import { showError, clearError } from './js/utils.js';
+
+    const errEl = document.getElementById('error');
+    const loadingEl = document.getElementById('loading');
+    const contentEl = document.getElementById('content');
+    const periodEl = document.getElementById('period');
+    const refreshEl = document.getElementById('btn-refresh');
+    const listEl = document.getElementById('emp-list');
+
+    function defaultPeriod() {
+      const d = new Date();
+      const yr = d.getFullYear();
+      const mo = String(d.getMonth() + 1).padStart(2, '0');
+      return yr + '-' + mo;
+    }
+
+    async function boot() {
+      const liffId = CONFIG.LIFF_ID_ADMIN;
+      if (!liffId) {
+        loadingEl.style.display = 'none';
+        showError(errEl, 'ยังไม่ได้ตั้ง LIFF_ID_ADMIN ใน config.js');
+        return;
+      }
+      try {
+        await initAuth(liffId);
+      } catch (e) {
+        loadingEl.style.display = 'none';
+        showError(errEl, 'LIFF init: ' + e.message);
+        return;
+      }
+
+      periodEl.value = defaultPeriod();
+      loadingEl.style.display = 'none';
+      contentEl.style.display = 'block';
+      await load();
+    }
+
+    async function load() {
+      clearError(errEl);
+      listEl.innerHTML = '<div class="muted">กำลังโหลด...</div>';
+      try {
+        const result = await api.post('getOwnerDashboard', {
+          lineUserId: state.lineUserId,
+          period: periodEl.value,
+        });
+        renderList(result.employees, result.period);
+      } catch (e) {
+        if (e.code === 'not_owner') {
+          showError(errEl, 'เฉพาะเจ้าของเท่านั้นที่ใช้หน้านี้ได้');
+          listEl.innerHTML = '';
+        } else {
+          showError(errEl, e.message || e.code);
+        }
+      }
+    }
+
+    function renderList(employees, period) {
+      if (!employees || employees.length === 0) {
+        listEl.innerHTML = '<div class="muted">ไม่มีพาร์ทไทม์ active</div>';
+        return;
+      }
+      listEl.innerHTML = employees.map(function (e) {
+        const pay = e.payment;
+        const total = e.total_amount.toLocaleString();
+        let actions = '';
+        if (!pay) {
+          const disable = e.total_amount === 0 ? ' disabled' : '';
+          actions = '<button class="btn-primary" data-action="close" data-emp="' + e.employee_id + '"' + disable + '>' +
+            'ปิดยอด ' + total + ' บาท' +
+          '</button>';
+          if (e.pending > 0) {
+            actions += '<button class="btn-primary" data-action="close-force" data-emp="' + e.employee_id + '" style="background:#e65100">' +
+              'ปิดทั้งที่มี pending ' + e.pending +
+            '</button>';
+          }
+        } else if (pay.status === 'รอจ่าย') {
+          actions = '<button class="btn-primary" data-action="paid" data-pid="' + pay.payment_id + '" style="background:#1565c0">' +
+            'ทำเครื่องหมายจ่ายแล้ว' +
+          '</button>';
+        } else {
+          actions = '<button class="btn-primary" disabled style="background:#888">✅ จ่ายแล้ว</button>';
+        }
+
+        return '<div class="emp-row">' +
+          '<div class="emp-head">' +
+            '<div><span class="emp-name">' + escape_(e.display_name) + '</span> ' +
+              '<span class="emp-id">' + escape_(e.employee_id) + '</span></div>' +
+            (pay ? '<span class="pay-status ' + pay.status + '">' + pay.status + '</span>' : '') +
+          '</div>' +
+          (pay ? '<div class="pay-info">' +
+            pay.payment_id + ' • ปิดยอด ' + escape_(pay.closed_at) +
+            (pay.paid_at ? ' • จ่าย ' + escape_(pay.paid_at) : '') +
+          '</div>' : '') +
+          '<div class="emp-stats">' +
+            '<div class="item"><div class="num">' + e.approved_full + '</div><div class="label">เต็มวัน</div></div>' +
+            '<div class="item"><div class="num">' + e.approved_half + '</div><div class="label">ครึ่งวัน</div></div>' +
+            '<div class="item pending"><div class="num">' + e.pending + '</div><div class="label">รออนุมัติ</div></div>' +
+            '<div class="item total"><div class="num">' + total + '</div><div class="label">รวม ฿</div></div>' +
+          '</div>' +
+          '<div class="emp-actions">' + actions + '</div>' +
+        '</div>';
+      }).join('');
+
+      // wire buttons
+      listEl.querySelectorAll('button[data-action]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          const a = btn.dataset.action;
+          if (a === 'close')        return doClose(btn.dataset.emp, false);
+          if (a === 'close-force')  return doClose(btn.dataset.emp, true);
+          if (a === 'paid')         return doMarkPaid(btn.dataset.pid);
+        });
+      });
+    }
+
+    async function doClose(employeeId, confirm) {
+      const period = periodEl.value;
+      const msg = confirm
+        ? 'ปิดยอด ' + employeeId + ' รอบ ' + period + ' (มี pending ค้าง — ปิดเลยจะไม่นับ pending)\n\nยืนยัน?'
+        : 'ปิดยอด ' + employeeId + ' รอบ ' + period + ' ?';
+      if (!window.confirm(msg)) return;
+      try {
+        const result = await api.post('closePeriod', {
+          lineUserId: state.lineUserId,
+          employeeId: employeeId,
+          period: period,
+          confirm: confirm,
+        });
+        alert('✅ ปิดยอดสำเร็จ — รวม ' + result.total + ' บาท');
+        await load();
+      } catch (e) {
+        if (e.code === 'has_pending') {
+          alert('⚠️ ยังมี ' + e.data.pending + ' วัน pending — กดปุ่มแดง "ปิดทั้งที่มี pending" ถ้ายืนยัน');
+        } else {
+          alert('ผิดพลาด: ' + (e.message || e.code));
+        }
+      }
+    }
+
+    async function doMarkPaid(paymentId) {
+      if (!window.confirm('ยืนยันว่าโอนเงินสำหรับ ' + paymentId + ' แล้ว?')) return;
+      try {
+        await api.post('markPaid', { lineUserId: state.lineUserId, paymentId: paymentId });
+        alert('✅ ทำเครื่องหมายจ่ายแล้ว');
+        await load();
+      } catch (e) {
+        alert('ผิดพลาด: ' + (e.message || e.code));
+      }
+    }
+
+    function escape_(s) {
+      return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    refreshEl.addEventListener('click', load);
+    periodEl.addEventListener('change', load);
+    boot();
+  </script>
+</body>
+</html>

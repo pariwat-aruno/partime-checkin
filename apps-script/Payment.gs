@@ -12,6 +12,10 @@ function closePeriod(payload) {
   if (!payload || !payload.employeeId) {
     return { ok: false, error: 'missing_fields' };
   }
+  // owner only
+  if (!isOwner(payload.lineUserId)) {
+    return { ok: false, error: 'not_owner' };
+  }
   const emp = findEmployeeById_(payload.employeeId);
   if (!emp) return { ok: false, error: 'employee_not_found' };
 
