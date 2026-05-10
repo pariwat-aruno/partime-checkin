@@ -64,6 +64,23 @@ function testSendEndOfWork() {
   Logger.log('ส่ง end-of-work broadcast เรียบร้อย ดู LINE chat ของ active employees');
 }
 
+/** ทดสอบทุก slot reminder + EOW ในรอบเดียว (สำหรับ demo) */
+function testSendAllRemindersAndEow() {
+  const cfg = getConfig();
+  const today = todayBangkok();
+  for (let s = 1; s <= 4; s++) {
+    sendSlotReminder_(cfg, s, today, 1);
+    Utilities.sleep(500);  // หน่วงเล็กน้อยกัน LINE rate limit
+  }
+  sendEndOfWorkBroadcast_();
+  Logger.log('ส่งครบ — slot 1-4 reminder + EOW broadcast');
+}
+
+/** test round 2 (ครั้งสุดท้าย) — เผื่อต้องการดูข้อความเข้มกว่า */
+function testSendSlotReminderSlot1Round2() {
+  sendSlotReminder_(getConfig(), 1, todayBangkok(), 2);
+}
+
 function tickReminders() {
   try {
     const cfg = getConfig();
