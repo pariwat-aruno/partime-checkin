@@ -127,7 +127,7 @@ function imageBlock_(label, url) {
       },
       {
         type: 'image',
-        url: url || 'https://via.placeholder.com/300x300?text=no+image',
+        url: driveUrlToThumbnail_(url) || 'https://via.placeholder.com/300x300?text=no+image',
         size: 'full',
         aspectMode: 'cover',
         aspectRatio: '1:1',
@@ -135,6 +135,21 @@ function imageBlock_(label, url) {
       },
     ],
   };
+}
+
+/**
+ * แปลง Google Drive file URL → direct thumbnail URL ที่ LINE Flex render ได้
+ *
+ * input:  https://drive.google.com/file/d/{ID}/view?usp=...
+ * output: https://drive.google.com/thumbnail?id={ID}&sz=w800
+ *
+ * ถ้า URL ไม่ใช่ Drive หรือ extract ID ไม่ได้ → คืนค่าเดิม (น่าจะเป็น public image URL อยู่แล้ว)
+ */
+function driveUrlToThumbnail_(url) {
+  if (!url) return '';
+  const m = String(url).match(/\/file\/d\/([^\/\?]+)/);
+  if (!m) return url;
+  return 'https://drive.google.com/thumbnail?id=' + m[1] + '&sz=w800';
 }
 
 function infoRow_(label, value) {
