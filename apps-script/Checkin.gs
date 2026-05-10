@@ -124,11 +124,12 @@ function checkin(payload) {
     distance: distance, outOfRange: slotOutOfRange,
   });
 
-  // push flex หาเจ้าของเฉพาะตอนสแกนครบ 4 (กันสแปม)
+  // push flex card หา owner ทุกคน — ทุก slot
+  // slot 1-3 = progress card (ไม่มีปุ่ม), slot 4 = approval card (3 ปุ่ม + 4 รูป)
   let completed = false;
-  if (newScanCount === 4) {
-    completed = true;
-    try {
+  try {
+    if (newScanCount === 4) {
+      completed = true;
       const slots = collectSlotsFromRow_(sh, rowNum, colIdx, cfg);
       const hasOutOfRange = sh.getRange(rowNum, colIdx['has_out_of_range']).getValue() === true;
       const checkinId = sh.getRange(rowNum, colIdx['checkin_id']).getValue();
@@ -145,9 +146,23 @@ function checkin(payload) {
         scanCount: newScanCount,
       });
       pushToAllOwners([card]);
-    } catch (err) {
-      logError('checkin', 'push flex failed: ' + err.message, { rowNum: rowNum });
+    } else {
+      const card = buildScanProgressCard({
+        displayName: emp.display_name,
+        employeeId: emp.employee_id,
+        slot: slot,
+        slotLabel: slotLabel,
+        scanCount: newScanCount,
+        selfieUrl: selfieUrl,
+        distanceM: distance,
+        radiusM: Number(cfg.geofence_radius_m),
+        outOfRange: slotOutOfRange,
+        at: nowBangkok(),
+      });
+      pushToAllOwners([card]);
     }
+  } catch (err) {
+    logError('checkin', 'push flex failed: ' + err.message, { rowNum: rowNum, slot: slot });
   }
 
   return {

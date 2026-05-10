@@ -231,6 +231,111 @@ function actionButton_(label, postbackData, color) {
   };
 }
 
+/**
+ * Card สำหรับ "พาร์ทไทม์ใหม่ลงทะเบียน" — push หา owner ตอน register สำเร็จ
+ * input: { employeeId, displayName, phone, bankName, bankAccountNo, bankAccountName, selfieUrl, idCardUrl }
+ */
+function buildRegistrationCard(args) {
+  return {
+    type: 'flex',
+    altText: '🆕 พาร์ทไทม์ใหม่: ' + args.displayName,
+    contents: {
+      type: 'bubble',
+      size: 'mega',
+      header: {
+        type: 'box', layout: 'vertical', backgroundColor: '#06c755', paddingAll: '14px',
+        contents: [
+          { type: 'text', text: '🆕 พาร์ทไทม์ลงทะเบียนใหม่', color: '#ffffff', weight: 'bold', size: 'lg' },
+          { type: 'text', text: args.employeeId, color: '#ffffff', size: 'sm', margin: 'sm' },
+        ],
+      },
+      body: {
+        type: 'box', layout: 'vertical', spacing: 'md',
+        contents: [
+          {
+            type: 'box', layout: 'horizontal', spacing: 'sm',
+            contents: [
+              imageBlockSimple_('selfie', args.selfieUrl),
+              imageBlockSimple_('บัตร ปชช.', args.idCardUrl),
+            ],
+          },
+          { type: 'separator', margin: 'md' },
+          infoRow_('ชื่อ', args.displayName),
+          infoRow_('เบอร์', args.phone || '—'),
+          infoRow_('ธนาคาร', args.bankName || '—'),
+          infoRow_('เลขบัญชี', args.bankAccountNo || '—'),
+          infoRow_('ชื่อบัญชี', args.bankAccountName || '—'),
+        ],
+      },
+      footer: {
+        type: 'box', layout: 'vertical',
+        contents: [{
+          type: 'text', size: 'xs', color: '#888888', wrap: true, align: 'center',
+          text: 'ตรวจสอบ + ระงับ is_active=FALSE ใน Sheet ถ้าไม่ผ่าน',
+        }],
+      },
+    },
+  };
+}
+
+/**
+ * Card สำหรับ "สแกน slot N (1-3)" — push หา owner หลังแต่ละ scan
+ * input: { displayName, employeeId, slot, slotLabel, scanCount, selfieUrl, distanceM, radiusM, outOfRange, at }
+ */
+function buildScanProgressCard(args) {
+  const time = formatBangkokTimeOnly_(args.at);
+  const headerBg = args.outOfRange ? '#e53935' : '#1565c0';
+  const headerLabel = (args.outOfRange ? '⚠️ ' : '✓ ') + 'สแกน ' + args.slotLabel + ' (' + args.scanCount + '/4)';
+  const distanceText = args.outOfRange
+    ? args.distanceM + ' m (นอกรัศมี ' + args.radiusM + ' m)'
+    : args.distanceM + ' m';
+  const distanceColor = args.outOfRange ? '#e53935' : '#222222';
+
+  return {
+    type: 'flex',
+    altText: headerLabel + ' — ' + args.displayName,
+    contents: {
+      type: 'bubble',
+      size: 'kilo',
+      header: {
+        type: 'box', layout: 'vertical', backgroundColor: headerBg, paddingAll: '12px',
+        contents: [
+          { type: 'text', text: headerLabel, color: '#ffffff', weight: 'bold', size: 'md', wrap: true },
+          { type: 'text', text: time + ' • ' + args.displayName, color: '#ffffff', size: 'xs', margin: 'sm' },
+        ],
+      },
+      body: {
+        type: 'box', layout: 'vertical', spacing: 'sm',
+        contents: [
+          {
+            type: 'image',
+            url: driveUrlToThumbnail_(args.selfieUrl) || 'https://via.placeholder.com/300x300',
+            size: 'full', aspectMode: 'cover', aspectRatio: '1:1',
+          },
+          { type: 'separator', margin: 'sm' },
+          infoRow_('พนักงาน', args.employeeId + ' — ' + args.displayName),
+          infoRowColored_('ระยะ', distanceText, distanceColor),
+          infoRow_('สแกนแล้ว', args.scanCount + '/4'),
+        ],
+      },
+    },
+  };
+}
+
+function imageBlockSimple_(label, url) {
+  return {
+    type: 'box', layout: 'vertical', flex: 1,
+    contents: [
+      { type: 'text', text: label, size: 'xxs', color: '#888888', align: 'center' },
+      {
+        type: 'image',
+        url: driveUrlToThumbnail_(url) || 'https://via.placeholder.com/300x300',
+        size: 'full', aspectMode: 'cover', aspectRatio: '1:1', margin: 'sm',
+      },
+    ],
+  };
+}
+
 function driveUrlToThumbnail_(url) {
   if (!url) return '';
   const m = String(url).match(/\/file\/d\/([^\/\?]+)/);

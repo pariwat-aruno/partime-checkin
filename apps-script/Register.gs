@@ -60,10 +60,27 @@ function register(payload) {
 
   logInfo('register', 'created employee', { employeeId: employeeId, lineUserId: payload.lineUserId });
 
-  // welcome message
+  // welcome message หาผู้ลงทะเบียน
   pushText(payload.lineUserId,
     'ยินดีต้อนรับ ' + payload.displayName + ' (' + employeeId + ')\n\n' +
     'ลงทะเบียนเรียบร้อย — กดเมนู "เช็คอิน" ตอนถึงร้านได้เลย');
+
+  // push card หา owner ทุกคน — แจ้งว่ามีพาร์ทไทม์ใหม่
+  try {
+    const card = buildRegistrationCard({
+      employeeId: employeeId,
+      displayName: payload.displayName,
+      phone: payload.phone,
+      bankName: payload.bankName,
+      bankAccountNo: payload.bankAccountNo,
+      bankAccountName: payload.bankAccountName,
+      selfieUrl: selfieUrl,
+      idCardUrl: idCardUrl,
+    });
+    pushToAllOwners([card]);
+  } catch (err) {
+    logError('register', 'push owner notification failed: ' + err.message, { employeeId: employeeId });
+  }
 
   return { ok: true, employeeId: employeeId };
 }
