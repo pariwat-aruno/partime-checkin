@@ -293,7 +293,7 @@ function buildEndOfWorkCard(employeeName) {
   const nowText = formatThaiDateTime();
   return {
     type: 'flex',
-    altText: BRAND + ' — ⚠️ ถึงเวลาเลิกงาน — ออกจากออฟิศทันที',
+    altText: BRAND + ' — ⚠️ ถึงเวลาเลิกงาน — ออกจากออฟฟิศทันที',
     contents: {
       type: 'bubble', size: 'mega',
       header: {
@@ -328,7 +328,7 @@ function buildEndOfWorkCard(employeeName) {
             color: WARNING, weight: 'bold', size: 'lg', align: 'center', wrap: true, margin: 'md',
           },
           {
-            type: 'text', text: 'ให้ออกจากออฟิศทันที',
+            type: 'text', text: 'ให้ออกจากออฟฟิศทันที',
             color: TEXT, weight: 'bold', size: 'md', align: 'center', wrap: true, margin: 'sm',
           },
           { type: 'separator', margin: 'lg', color: AMBER },
