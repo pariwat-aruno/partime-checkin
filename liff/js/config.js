@@ -10,7 +10,7 @@ export const CONFIG = {
   LIFF_ID_BALANCE:  '2010027935-GqOSphZC',
 
   // Apps Script Web App URL — POST endpoint ของ backend
-  API_URL: 'https://script.google.com/macros/s/AKfycbxvGW3oUma8Ib37d6gxExhOP1K3Lo2NA3ayScowWMKvBY2PR1E1amYlO4QLjJdWe5C-rQ/exec',
+  API_URL: 'https://script.google.com/macros/s/AKfycbzfhvs91IrzAW_L9UfNbGM5ndR-Wb2tfkNO4qeATMbzpol6vmeoVUt0u4Ro5n2wY0KIPQ/exec',
 
   // dev mode — true = mock LIFF (ทดสอบใน browser ปกติ ไม่ผ่าน LINE)
   DEV_MOCK_LIFF: false,
