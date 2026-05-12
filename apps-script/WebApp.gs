@@ -61,6 +61,7 @@ function routeAction_(action, payload) {
     case 'approveCheckin':        return approveCheckin(payload);
     case 'closePeriod':           return closePeriod(payload);
     case 'markPaid':              return markPaid(payload);
+    case 'getOwnerLogs':          return getOwnerLogs(payload);
     default:
       return { ok: false, error: 'unknown_action', action: action };
   }
@@ -296,7 +297,7 @@ function handlePostback_(ev) {
   }
 
   if (data.action === 'approve' || data.action === 'reject') {
-    const result = updateCheckinStatus_(data.id, data.action, data.type);
+    const result = updateCheckinStatus_(data.id, data.action, data.type, userId);
     if (!result.ok) {
       return replyText(ev.replyToken, '❌ ' + result.error);
     }
@@ -323,7 +324,7 @@ function parsePostbackData_(s) {
  * approve half → status=approved, day_type=half, wage=200
  * reject       → status=rejected, day_type=none, wage=0
  */
-function updateCheckinStatus_(checkinId, action, type) {
+function updateCheckinStatus_(checkinId, action, type, ownerUserId) {
   const sheetId = PropertiesService.getScriptProperties().getProperty('SHEET_ID');
   const sh = SpreadsheetApp.openById(sheetId).getSheetByName('Checkins');
   const last = sh.getLastRow();
@@ -373,6 +374,16 @@ function updateCheckinStatus_(checkinId, action, type) {
   const empName = emp ? emp.display_name : empId;
 
   logInfo('postback', action, { checkinId: checkinId, type: type, employeeId: empId });
+
+  // audit log: owner คนไหนทำ approve/reject อะไร
+  const ownerAction = (action === 'approve')
+    ? (type === 'half' ? 'approve_half' : 'approve_full')
+    : 'reject';
+  logOwnerAction(ownerUserId, ownerAction, checkinId, empName, {
+    date: dateStr,
+    wage: wage,
+    day_type: dayType,
+  });
 
   return {
     ok: true,

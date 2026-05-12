@@ -58,6 +58,14 @@ function closePeriod(payload) {
 
   logInfo('closePeriod', 'created payment', { paymentId: paymentId, employeeId: emp.employee_id, total: stats.total });
 
+  logOwnerAction(payload.lineUserId, 'close_period', paymentId, emp.display_name, {
+    period: period,
+    days_full: stats.full,
+    days_half: stats.half,
+    total: stats.total,
+    is_resign: !!payload.isResign,
+  });
+
   // push สรุปหาเจ้าของทุกคน
   pushToAllOwners([{
     type: 'text',

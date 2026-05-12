@@ -139,10 +139,23 @@ function markPaid(payload) {
 
   const iStatus = headers.indexOf('status') + 1;
   const iPaid = headers.indexOf('paid_at') + 1;
+  const iEmp = headers.indexOf('employee_id');
+  const iAmount = headers.indexOf('total_amount');
+  const iPeriod = headers.indexOf('period');
+  const rowVals = sh.getRange(rowIdx, 1, 1, sh.getLastColumn()).getValues()[0];
+  const emp = findEmployeeById_(rowVals[iEmp]);
+  const empName = emp ? emp.display_name : rowVals[iEmp];
+
   sh.getRange(rowIdx, iStatus).setValue('จ่ายแล้ว');
   sh.getRange(rowIdx, iPaid).setValue(nowBangkok());
 
   logInfo('markPaid', 'paid', { paymentId: payload.paymentId });
+
+  logOwnerAction(payload.lineUserId, 'mark_paid', payload.paymentId, empName, {
+    period: rowVals[iPeriod],
+    total: Number(rowVals[iAmount] || 0),
+  });
+
   return { ok: true };
 }
 
@@ -235,7 +248,7 @@ function approveCheckin(payload) {
   if (!isOwner(payload && payload.lineUserId)) return { ok: false, error: 'not_owner' };
   if (!payload.checkinId || !payload.action) return { ok: false, error: 'missing_fields' };
   // updateCheckinStatus_ อยู่ใน WebApp.gs (shared namespace)
-  return updateCheckinStatus_(payload.checkinId, payload.action, payload.type);
+  return updateCheckinStatus_(payload.checkinId, payload.action, payload.type, payload.lineUserId);
 }
 
 function driveThumbnail__(url) {

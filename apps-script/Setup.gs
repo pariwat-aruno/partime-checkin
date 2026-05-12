@@ -65,6 +65,15 @@ const SHEET_HEADERS = {
   ],
   Logs: ['timestamp', 'level', 'function', 'message', 'payload'],
   Config: ['key', 'value'],
+  OwnerLogs: [
+    'timestamp',
+    'owner_user_id',
+    'owner_name',
+    'action',
+    'target_id',
+    'target_name',
+    'detail',
+  ],
 };
 
 /**

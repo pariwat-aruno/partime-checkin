@@ -102,6 +102,44 @@
     .pending-actions .full   { background: var(--cherry);     color: #fff; }
     .pending-actions .half   { background: var(--cherry-dark); color: #fff; }
     .pending-actions .reject { background: var(--reject);     color: #fff; }
+
+    /* Activity log */
+    #log-section { margin-top: 18px; }
+    #log-section > summary {
+      cursor: pointer; padding: 12px 14px; background: var(--bg);
+      border: 1px solid var(--border); border-radius: 10px;
+      font-weight: 600; font-size: 14px; color: var(--text);
+      list-style: none; user-select: none;
+    }
+    #log-section > summary::-webkit-details-marker { display: none; }
+    #log-section[open] > summary { border-radius: 10px 10px 0 0; background: var(--cherry-tint); }
+    #log-body {
+      border: 1px solid var(--border); border-top: none;
+      border-radius: 0 0 10px 10px; padding: 10px; background: var(--white);
+      max-height: 60vh; overflow-y: auto;
+    }
+    .log-item {
+      padding: 10px 8px; border-bottom: 1px solid var(--border);
+      font-size: 13px;
+    }
+    .log-item:last-child { border-bottom: none; }
+    .log-item .top {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 4px;
+    }
+    .log-item .owner { font-weight: 600; color: var(--cherry-dark); }
+    .log-item .time  { color: var(--muted); font-size: 11px; }
+    .log-item .body  { font-size: 13px; color: var(--text); }
+    .log-item .target { color: var(--muted); font-size: 11px; margin-top: 2px; }
+    .log-tag {
+      display: inline-block; padding: 1px 8px; border-radius: 10px;
+      font-size: 11px; font-weight: 600; margin-right: 6px;
+    }
+    .log-tag.approve_full { background: #dcfce7; color: #166534; }
+    .log-tag.approve_half { background: #fef3c7; color: #92400e; }
+    .log-tag.reject       { background: var(--cherry-tint); color: var(--cherry-dark); }
+    .log-tag.close_period { background: #e0e7ff; color: #3730a3; }
+    .log-tag.mark_paid    { background: #cffafe; color: #155e75; }
   </style>
 </head>
 <body>
@@ -120,6 +158,13 @@
         <button id="btn-refresh" class="btn-primary">โหลด</button>
       </div>
       <div id="emp-list"></div>
+
+      <details id="log-section">
+        <summary>📋 บันทึกกิจกรรม owner</summary>
+        <div id="log-body">
+          <div class="muted">กดเพื่อโหลด...</div>
+        </div>
+      </details>
     </div>
   </div>
 
@@ -366,6 +411,83 @@
 
     refreshEl.addEventListener('click', load);
     periodEl.addEventListener('change', load);
+
+    // activity log — lazy load + refresh ทุกครั้งที่กดเปิด
+    const logSection = document.getElementById('log-section');
+    const logBody = document.getElementById('log-body');
+    logSection.addEventListener('toggle', function () {
+      if (logSection.open) loadOwnerLogs();
+    });
+
+    async function loadOwnerLogs() {
+      logBody.innerHTML = '<div class="muted">กำลังโหลด...</div>';
+      try {
+        const r = await api.post('getOwnerLogs', { lineUserId: state.lineUserId, limit: 100 });
+        renderOwnerLogs(r.items);
+      } catch (e) {
+        logBody.innerHTML = '<div class="error">ผิดพลาด: ' + (e.message || e.code) + '</div>';
+      }
+    }
+
+    function renderOwnerLogs(items) {
+      if (!items || items.length === 0) {
+        logBody.innerHTML = '<div class="muted">ยังไม่มีบันทึก</div>';
+        return;
+      }
+      const actionLabel = {
+        approve_full: 'อนุมัติเต็มวัน',
+        approve_half: 'อนุมัติครึ่งวัน',
+        reject: 'ไม่อนุมัติ',
+        close_period: 'ปิดยอด',
+        mark_paid: 'จ่ายแล้ว',
+      };
+      logBody.innerHTML = items.map(function (it) {
+        const tag = String(it.action || '');
+        const label = actionLabel[tag] || tag;
+        const time = formatLogTime_(it.timestamp);
+        let detailText = '';
+        try {
+          const d = it.detail ? JSON.parse(it.detail) : null;
+          if (d) detailText = formatDetail_(tag, d);
+        } catch (_) { detailText = String(it.detail || ''); }
+
+        return '<div class="log-item">' +
+          '<div class="top">' +
+            '<span class="owner">' + escape_(it.owner_name || it.owner_user_id) + '</span>' +
+            '<span class="time">' + escape_(time) + '</span>' +
+          '</div>' +
+          '<div class="body"><span class="log-tag ' + escape_(tag) + '">' + escape_(label) + '</span>' +
+            escape_(it.target_name || '') + '</div>' +
+          (detailText ? '<div class="target">' + escape_(detailText) + ' • ' + escape_(it.target_id) + '</div>'
+                      : '<div class="target">' + escape_(it.target_id) + '</div>') +
+        '</div>';
+      }).join('');
+    }
+
+    function formatDetail_(action, d) {
+      if (action === 'approve_full' || action === 'approve_half') {
+        return d.date + ' • ' + d.wage + ' บาท';
+      }
+      if (action === 'reject') {
+        return d.date || '';
+      }
+      if (action === 'close_period') {
+        return d.period + ' • ' + d.days_full + '+' + d.days_half + ' = ' + d.total + ' บาท' + (d.is_resign ? ' (ลาออก)' : '');
+      }
+      if (action === 'mark_paid') {
+        return d.period + ' • ' + d.total + ' บาท';
+      }
+      return '';
+    }
+
+    function formatLogTime_(ts) {
+      // ts format = "2026-05-12T14:30:15+07:00"
+      if (!ts) return '';
+      const m = String(ts).match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+      if (!m) return String(ts);
+      return m[3] + '/' + m[2] + ' ' + m[4] + ':' + m[5];
+    }
+
     boot();
   </script>
 </body>
