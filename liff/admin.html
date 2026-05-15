@@ -209,6 +209,20 @@
     const refreshEl = document.getElementById('btn-refresh');
     const listEl = document.getElementById('emp-list');
 
+    function showFatalError(msg) {
+      loadingEl.style.display = 'none';
+      contentEl.style.display = 'none';
+      showError(errEl, msg);
+    }
+
+    window.addEventListener('error', function (ev) {
+      showFatalError('Owner page error: ' + (ev.message || 'unknown error'));
+    });
+    window.addEventListener('unhandledrejection', function (ev) {
+      const reason = ev.reason || {};
+      showFatalError('Owner page error: ' + (reason.message || reason.code || String(reason)));
+    });
+
     function defaultPeriod() {
       const d = new Date();
       return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
@@ -223,8 +237,7 @@
       }
       try { await initAuth(liffId); }
       catch (e) {
-        loadingEl.style.display = 'none';
-        showError(errEl, 'LIFF init: ' + e.message);
+        showFatalError('LIFF init: ' + e.message);
         return;
       }
       periodEl.value = defaultPeriod();

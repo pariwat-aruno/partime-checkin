@@ -29,10 +29,12 @@ jobs:
         run: |
           SHA="${GITHUB_SHA::8}"
           cd liff
-          # ใส่ ?v=<sha> หลัง .js ใน import statement + script src
-          # กัน LINE webview cache
-          find . -type f \( -name "*.html" -o -name "*.js" \) \
-            -exec sed -i "s|\.js\"|.js?v=${SHA}\"|g; s|\.js'|.js?v=${SHA}'|g" {} +
+          # ใส่ ?v=<sha> เฉพาะ local module imports ของเรา
+          # ห้ามแตะ external scripts เช่น LINE LIFF SDK
+          find . -type f -name "*.html" \
+            -exec sed -i -E "s|(from './js/[^']+\.js)'|\1?v=${SHA}'|g; s|(from \"./js/[^\"]+\.js)\"|\1?v=${SHA}\"|g" {} +
+          find ./js -type f -name "*.js" \
+            -exec sed -i -E "s|(from './[^']+\.js)'|\1?v=${SHA}'|g; s|(from \"./[^\"]+\.js)\"|\1?v=${SHA}\"|g" {} +
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
