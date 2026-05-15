@@ -36,7 +36,13 @@ function doPost(e) {
 
     // LIFF action
     if (body.action) {
-      const result = routeAction_(body.action, body.payload || {});
+      const auth = authenticateLiffRequest_(body);
+      if (!auth.ok) return jsonOut_(auth);
+
+      const payload = body.payload || {};
+      payload.lineUserId = auth.lineUserId;
+
+      const result = routeAction_(body.action, payload);
       return jsonOut_(result);
     }
 
@@ -65,6 +71,65 @@ function routeAction_(action, payload) {
     default:
       return { ok: false, error: 'unknown_action', action: action };
   }
+}
+
+/**
+ * Verify LIFF idToken with LINE, then use token `sub` as trusted lineUserId.
+ *
+ * Backward/dev escape hatch:
+ * set Script Property DEV_ALLOW_INSECURE_LIFF=true to allow payload.lineUserId
+ * without idToken. Do not enable that in production.
+ */
+function authenticateLiffRequest_(body) {
+  const props = PropertiesService.getScriptProperties();
+  const idToken = body && body.idToken;
+
+  if (!idToken) {
+    if (props.getProperty('DEV_ALLOW_INSECURE_LIFF') === 'true') {
+      const payload = body.payload || {};
+      if (payload.lineUserId) return { ok: true, lineUserId: payload.lineUserId, insecureDev: true };
+    }
+    return { ok: false, error: 'auth_required' };
+  }
+
+  const clientId = getLiffChannelId_();
+  const res = UrlFetchApp.fetch('https://api.line.me/oauth2/v2.1/verify', {
+    method: 'post',
+    payload: {
+      id_token: idToken,
+      client_id: clientId,
+    },
+    muteHttpExceptions: true,
+  });
+
+  const code = res.getResponseCode();
+  let data = {};
+  try {
+    data = JSON.parse(res.getContentText());
+  } catch (_) {
+    data = {};
+  }
+
+  if (code !== 200 || !data.sub) {
+    logWarn('auth', 'LIFF idToken verify failed', { code: code, body: data });
+    return { ok: false, error: 'invalid_auth' };
+  }
+
+  return { ok: true, lineUserId: data.sub };
+}
+
+function getLiffChannelId_() {
+  const props = PropertiesService.getScriptProperties();
+  const explicit = props.getProperty('LINE_LOGIN_CHANNEL_ID');
+  if (explicit) return explicit;
+
+  const liffId = props.getProperty('LIFF_ID_REGISTER') ||
+                 props.getProperty('LIFF_ID_CHECKIN') ||
+                 props.getProperty('LIFF_ID_BALANCE') ||
+                 '';
+  const m = String(liffId).match(/^(\d+)-/);
+  if (!m) throw new Error('missing LINE_LOGIN_CHANNEL_ID Script Property');
+  return m[1];
 }
 
 /** จัดการ LINE event ทุกชนิด */
@@ -97,6 +162,7 @@ function handleLineEvent_(ev) {
 function handleMessageEvent_(ev) {
   const userId = ev.source && ev.source.userId;
   const text = (ev.message.text || '').trim();
+  const lower = text.toLowerCase();
   logInfo('message', text, { userId: userId });
 
   if (text.toLowerCase() === 'id') {
@@ -117,7 +183,6 @@ function handleMessageEvent_(ev) {
       'บริษัท วอร์ด้า สกินแคร์ จำกัด');
   }
 
-  const lower = text.toLowerCase();
   if (lower === 'รอ' || lower === 'pending' || lower === 'รออนุมัติ') {
     return replyPendingApprovals_(ev);
   }

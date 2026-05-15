@@ -47,134 +47,143 @@ function checkin(payload) {
   ));
   const slotOutOfRange = distance > Number(cfg.geofence_radius_m);
 
-  // หา / สร้างแถวของวันนี้
-  const today = todayBangkok();
-  const sheetId = PropertiesService.getScriptProperties().getProperty('SHEET_ID');
-  const sh = SpreadsheetApp.openById(sheetId).getSheetByName('Checkins');
-  const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
-  const colIdx = {};
-  headers.forEach(function (h, i) { colIdx[h] = i + 1; }); // 1-based
-
-  let rowNum = findCheckinRowForDate_(sh, headers, emp.employee_id, today);
-  let scanCount = 0;
-
-  if (rowNum > 0) {
-    // มีแถววันนี้แล้ว
-    const slotAtCol = colIdx['slot' + slot + '_at'];
-    const existing = sh.getRange(rowNum, slotAtCol).getValue();
-    if (existing) {
-      // slot นี้สแกนไปแล้ว — ไม่ overwrite
-      const existingScanCount = Number(sh.getRange(rowNum, colIdx['scan_count']).getValue() || 0);
-      const existingCheckinId = sh.getRange(rowNum, colIdx['checkin_id']).getValue();
-      logInfo('checkin', 'slot already scanned', { employeeId: emp.employee_id, slot: slot, date: today });
-      return {
-        ok: true,
-        checkinId: existingCheckinId,
-        slot: slot,
-        slotLabel: slotLabel,
-        scanCount: existingScanCount,
-        alreadyScanned: true,
-      };
-    }
-    scanCount = Number(sh.getRange(rowNum, colIdx['scan_count']).getValue() || 0);
-  } else {
-    // สร้างแถวใหม่
-    const newCheckinId = nextCheckinId(today);
-    const newRow = new Array(headers.length).fill('');
-    newRow[colIdx['checkin_id'] - 1] = newCheckinId;
-    newRow[colIdx['employee_id'] - 1] = emp.employee_id;
-    newRow[colIdx['checkin_date'] - 1] = today;
-    newRow[colIdx['scan_count'] - 1] = 0;
-    newRow[colIdx['has_out_of_range'] - 1] = false;
-    newRow[colIdx['status'] - 1] = 'pending';
-    newRow[colIdx['day_type'] - 1] = '';
-    newRow[colIdx['wage'] - 1] = 0;
-    sh.appendRow(newRow);
-    rowNum = sh.getLastRow();
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) {
+    return { ok: false, error: 'busy_try_again' };
   }
 
-  // upload selfie
-  const ts = Utilities.formatDate(new Date(), 'Asia/Bangkok', 'yyyyMMdd-HHmmss');
-  let selfieUrl;
   try {
-    selfieUrl = uploadImage(payload.selfieBase64,
-      'checkin-' + emp.employee_id + '-' + today + '-slot' + slot + '-' + ts + '.jpg',
-      'daily-checkins');
-  } catch (err) {
-    logError('checkin', 'upload failed: ' + err.message, { employeeId: emp.employee_id, slot: slot });
-    return { ok: false, error: 'upload_failed', detail: err.message };
-  }
+    // หา / สร้างแถวของวันนี้
+    const today = todayBangkok();
+    const sheetId = PropertiesService.getScriptProperties().getProperty('SHEET_ID');
+    const sh = SpreadsheetApp.openById(sheetId).getSheetByName('Checkins');
+    const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+    const colIdx = {};
+    headers.forEach(function (h, i) { colIdx[h] = i + 1; }); // 1-based
 
-  // update slot N + last_* + scan_count + has_out_of_range
-  sh.getRange(rowNum, colIdx['slot' + slot + '_at']).setValue(nowBangkok());
-  sh.getRange(rowNum, colIdx['slot' + slot + '_url']).setValue(selfieUrl);
-  sh.getRange(rowNum, colIdx['last_lat']).setValue(Number(payload.lat));
-  sh.getRange(rowNum, colIdx['last_lng']).setValue(Number(payload.lng));
-  sh.getRange(rowNum, colIdx['last_distance_m']).setValue(distance);
+    let rowNum = findCheckinRowForDate_(sh, headers, emp.employee_id, today);
+    let scanCount = 0;
 
-  const newScanCount = scanCount + 1;
-  sh.getRange(rowNum, colIdx['scan_count']).setValue(newScanCount);
-
-  if (slotOutOfRange) {
-    sh.getRange(rowNum, colIdx['has_out_of_range']).setValue(true);
-  }
-
-  logInfo('checkin', 'slot recorded', {
-    employeeId: emp.employee_id, slot: slot, scanCount: newScanCount,
-    distance: distance, outOfRange: slotOutOfRange,
-  });
-
-  // push flex card หา owner ทุกคน — ทุก slot
-  // slot 1-3 = progress card (ไม่มีปุ่ม), slot 4 = approval card (3 ปุ่ม + 4 รูป)
-  let completed = false;
-  try {
-    if (newScanCount === 4) {
-      completed = true;
-      const slots = collectSlotsFromRow_(sh, rowNum, colIdx, cfg);
-      const hasOutOfRange = sh.getRange(rowNum, colIdx['has_out_of_range']).getValue() === true;
-      const checkinId = sh.getRange(rowNum, colIdx['checkin_id']).getValue();
-      const card = buildApprovalCard({
-        checkinId: checkinId,
-        displayName: emp.display_name,
-        phone: emp.phone,
-        date: today,
-        slots: slots,
-        referenceSelfieUrl: emp.selfie_url,
-        lastDistanceM: distance,
-        radiusM: Number(cfg.geofence_radius_m),
-        hasOutOfRange: hasOutOfRange,
-        scanCount: newScanCount,
-      });
-      pushToAllOwners([card]);
+    if (rowNum > 0) {
+      // มีแถววันนี้แล้ว
+      const slotAtCol = colIdx['slot' + slot + '_at'];
+      const existing = sh.getRange(rowNum, slotAtCol).getValue();
+      if (existing) {
+        // slot นี้สแกนไปแล้ว — ไม่ overwrite
+        const existingScanCount = Number(sh.getRange(rowNum, colIdx['scan_count']).getValue() || 0);
+        const existingCheckinId = sh.getRange(rowNum, colIdx['checkin_id']).getValue();
+        logInfo('checkin', 'slot already scanned', { employeeId: emp.employee_id, slot: slot, date: today });
+        return {
+          ok: true,
+          checkinId: existingCheckinId,
+          slot: slot,
+          slotLabel: slotLabel,
+          scanCount: existingScanCount,
+          alreadyScanned: true,
+        };
+      }
+      scanCount = Number(sh.getRange(rowNum, colIdx['scan_count']).getValue() || 0);
     } else {
-      const card = buildScanProgressCard({
-        displayName: emp.display_name,
-        employeeId: emp.employee_id,
-        slot: slot,
-        slotLabel: slotLabel,
-        scanCount: newScanCount,
-        selfieUrl: selfieUrl,
-        distanceM: distance,
-        radiusM: Number(cfg.geofence_radius_m),
-        outOfRange: slotOutOfRange,
-        at: nowBangkok(),
-      });
-      pushToAllOwners([card]);
+      // สร้างแถวใหม่
+      const newCheckinId = nextCheckinId(today);
+      const newRow = new Array(headers.length).fill('');
+      newRow[colIdx['checkin_id'] - 1] = newCheckinId;
+      newRow[colIdx['employee_id'] - 1] = emp.employee_id;
+      newRow[colIdx['checkin_date'] - 1] = today;
+      newRow[colIdx['scan_count'] - 1] = 0;
+      newRow[colIdx['has_out_of_range'] - 1] = false;
+      newRow[colIdx['status'] - 1] = 'pending';
+      newRow[colIdx['day_type'] - 1] = '';
+      newRow[colIdx['wage'] - 1] = 0;
+      sh.appendRow(newRow);
+      rowNum = sh.getLastRow();
     }
-  } catch (err) {
-    logError('checkin', 'push flex failed: ' + err.message, { rowNum: rowNum, slot: slot });
-  }
 
-  return {
-    ok: true,
-    checkinId: sh.getRange(rowNum, colIdx['checkin_id']).getValue(),
-    slot: slot,
-    slotLabel: slotLabel,
-    scanCount: newScanCount,
-    distanceM: distance,
-    outOfRange: slotOutOfRange,
-    completed: completed,
-  };
+    // upload selfie
+    const ts = Utilities.formatDate(new Date(), 'Asia/Bangkok', 'yyyyMMdd-HHmmss');
+    let selfieUrl;
+    try {
+      selfieUrl = uploadImage(payload.selfieBase64,
+        'checkin-' + emp.employee_id + '-' + today + '-slot' + slot + '-' + ts + '.jpg',
+        'daily-checkins');
+    } catch (err) {
+      logError('checkin', 'upload failed: ' + err.message, { employeeId: emp.employee_id, slot: slot });
+      return { ok: false, error: 'upload_failed', detail: err.message };
+    }
+
+    // update slot N + last_* + scan_count + has_out_of_range
+    sh.getRange(rowNum, colIdx['slot' + slot + '_at']).setValue(nowBangkok());
+    sh.getRange(rowNum, colIdx['slot' + slot + '_url']).setValue(selfieUrl);
+    sh.getRange(rowNum, colIdx['last_lat']).setValue(Number(payload.lat));
+    sh.getRange(rowNum, colIdx['last_lng']).setValue(Number(payload.lng));
+    sh.getRange(rowNum, colIdx['last_distance_m']).setValue(distance);
+
+    const newScanCount = scanCount + 1;
+    sh.getRange(rowNum, colIdx['scan_count']).setValue(newScanCount);
+
+    if (slotOutOfRange) {
+      sh.getRange(rowNum, colIdx['has_out_of_range']).setValue(true);
+    }
+
+    logInfo('checkin', 'slot recorded', {
+      employeeId: emp.employee_id, slot: slot, scanCount: newScanCount,
+      distance: distance, outOfRange: slotOutOfRange,
+    });
+
+    // push flex card หา owner ทุกคน — ทุก slot
+    // slot 1-3 = progress card (ไม่มีปุ่ม), slot 4 = approval card (3 ปุ่ม + 4 รูป)
+    let completed = false;
+    try {
+      if (newScanCount === 4) {
+        completed = true;
+        const slots = collectSlotsFromRow_(sh, rowNum, colIdx, cfg);
+        const hasOutOfRange = sh.getRange(rowNum, colIdx['has_out_of_range']).getValue() === true;
+        const checkinId = sh.getRange(rowNum, colIdx['checkin_id']).getValue();
+        const card = buildApprovalCard({
+          checkinId: checkinId,
+          displayName: emp.display_name,
+          phone: emp.phone,
+          date: today,
+          slots: slots,
+          referenceSelfieUrl: emp.selfie_url,
+          lastDistanceM: distance,
+          radiusM: Number(cfg.geofence_radius_m),
+          hasOutOfRange: hasOutOfRange,
+          scanCount: newScanCount,
+        });
+        pushToAllOwners([card]);
+      } else {
+        const card = buildScanProgressCard({
+          displayName: emp.display_name,
+          employeeId: emp.employee_id,
+          slot: slot,
+          slotLabel: slotLabel,
+          scanCount: newScanCount,
+          selfieUrl: selfieUrl,
+          distanceM: distance,
+          radiusM: Number(cfg.geofence_radius_m),
+          outOfRange: slotOutOfRange,
+          at: nowBangkok(),
+        });
+        pushToAllOwners([card]);
+      }
+    } catch (err) {
+      logError('checkin', 'push flex failed: ' + err.message, { rowNum: rowNum, slot: slot });
+    }
+
+    return {
+      ok: true,
+      checkinId: sh.getRange(rowNum, colIdx['checkin_id']).getValue(),
+      slot: slot,
+      slotLabel: slotLabel,
+      scanCount: newScanCount,
+      distanceM: distance,
+      outOfRange: slotOutOfRange,
+      completed: completed,
+    };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /** หา rowNum ของ employee + วันที่ ใน Checkins — return 0 ถ้าไม่เจอ */

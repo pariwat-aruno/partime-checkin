@@ -19,70 +19,79 @@ function closePeriod(payload) {
   const emp = findEmployeeById_(payload.employeeId);
   if (!emp) return { ok: false, error: 'employee_not_found' };
 
-  const baseMonth = payload.period || thisMonthBangkok();
-  const period = payload.isResign ? (baseMonth + '-resign') : baseMonth;
-
-  const sheetId = PropertiesService.getScriptProperties().getProperty('SHEET_ID');
-  const ss = SpreadsheetApp.openById(sheetId);
-
-  // sum approved + count pending ในเดือน
-  const stats = sumApprovedAndPending_(ss, emp.employee_id, baseMonth);
-
-  // ถ้ามี pending → return warning ไม่สร้างแถว (เจ้าของต้อง confirm รอบสอง)
-  if (stats.pending > 0 && !payload.confirm) {
-    pushToAllOwners([{
-      type: 'text',
-      text: 'เตือนปิดยอด — ' + emp.display_name + ' (' + emp.employee_id + ')\n' +
-        'ยังมี ' + stats.pending + ' วันที่รออนุมัติ\n' +
-        'ถ้าจะปิดเลย ส่ง action ใหม่พร้อม confirm=true'
-    }]);
-    return { ok: false, error: 'has_pending', pending: stats.pending };
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) {
+    return { ok: false, error: 'busy_try_again' };
   }
 
-  // gen payment_id + insert
-  const paymentId = nextPaymentId(period);
-  const sh = ss.getSheetByName('Payments');
-  // header: payment_id, employee_id, period, total_days_full, total_days_half, total_amount, status, closed_at, paid_at, note
-  sh.appendRow([
-    paymentId,
-    emp.employee_id,
-    period,
-    stats.full,
-    stats.half,
-    stats.total,
-    'รอจ่าย',
-    nowBangkok(),
-    '',
-    payload.isResign ? 'ลาออก' : '',
-  ]);
+  try {
+    const baseMonth = payload.period || thisMonthBangkok();
+    const period = payload.isResign ? (baseMonth + '-resign') : baseMonth;
 
-  logInfo('closePeriod', 'created payment', { paymentId: paymentId, employeeId: emp.employee_id, total: stats.total });
+    const sheetId = PropertiesService.getScriptProperties().getProperty('SHEET_ID');
+    const ss = SpreadsheetApp.openById(sheetId);
 
-  logOwnerAction(payload.lineUserId, 'close_period', paymentId, emp.display_name, {
-    period: period,
-    days_full: stats.full,
-    days_half: stats.half,
-    total: stats.total,
-    is_resign: !!payload.isResign,
-  });
+    // sum approved + count pending ในเดือน
+    const stats = sumApprovedAndPending_(ss, emp.employee_id, baseMonth);
 
-  // push สรุปหาเจ้าของทุกคน
-  pushToAllOwners([{
-    type: 'text',
-    text: 'ปิดยอดสำเร็จ — บริษัท วอร์ด้า สกินแคร์ จำกัด\n' +
-      emp.display_name + ' (' + emp.employee_id + ')\n' +
-      'รอบ ' + period + '\n' +
-      stats.full + ' วันเต็ม + ' + stats.half + ' วันครึ่ง = ' + stats.total + ' บาท\n' +
-      'สถานะ: รอจ่าย'
-  }]);
+    // ถ้ามี pending → return warning ไม่สร้างแถว (เจ้าของต้อง confirm รอบสอง)
+    if (stats.pending > 0 && !payload.confirm) {
+      pushToAllOwners([{
+        type: 'text',
+        text: 'เตือนปิดยอด — ' + emp.display_name + ' (' + emp.employee_id + ')\n' +
+          'ยังมี ' + stats.pending + ' วันที่รออนุมัติ\n' +
+          'ถ้าจะปิดเลย ส่ง action ใหม่พร้อม confirm=true'
+      }]);
+      return { ok: false, error: 'has_pending', pending: stats.pending };
+    }
 
-  return {
-    ok: true,
-    paymentId: paymentId,
-    total: stats.total,
-    daysFull: stats.full,
-    daysHalf: stats.half,
-  };
+    // gen payment_id + insert
+    const paymentId = nextPaymentId(period);
+    const sh = ss.getSheetByName('Payments');
+    // header: payment_id, employee_id, period, total_days_full, total_days_half, total_amount, status, closed_at, paid_at, note
+    sh.appendRow([
+      paymentId,
+      emp.employee_id,
+      period,
+      stats.full,
+      stats.half,
+      stats.total,
+      'รอจ่าย',
+      nowBangkok(),
+      '',
+      payload.isResign ? 'ลาออก' : '',
+    ]);
+
+    logInfo('closePeriod', 'created payment', { paymentId: paymentId, employeeId: emp.employee_id, total: stats.total });
+
+    logOwnerAction(payload.lineUserId, 'close_period', paymentId, emp.display_name, {
+      period: period,
+      days_full: stats.full,
+      days_half: stats.half,
+      total: stats.total,
+      is_resign: !!payload.isResign,
+    });
+
+    // push สรุปหาเจ้าของทุกคน
+    pushToAllOwners([{
+      type: 'text',
+      text: 'ปิดยอดสำเร็จ — บริษัท วอร์ด้า สกินแคร์ จำกัด\n' +
+        emp.display_name + ' (' + emp.employee_id + ')\n' +
+        'รอบ ' + period + '\n' +
+        stats.full + ' วันเต็ม + ' + stats.half + ' วันครึ่ง = ' + stats.total + ' บาท\n' +
+        'สถานะ: รอจ่าย'
+    }]);
+
+    return {
+      ok: true,
+      paymentId: paymentId,
+      total: stats.total,
+      daysFull: stats.full,
+      daysHalf: stats.half,
+    };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function findEmployeeById_(employeeId) {

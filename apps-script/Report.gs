@@ -8,6 +8,9 @@
 
 /** API endpoint */
 function getDailyReport(payload) {
+  if (!isOwner(payload && payload.lineUserId)) {
+    return { ok: false, error: 'not_owner' };
+  }
   const date = payload && payload.date ? payload.date : todayBangkok();
   const list = listEmployeeScansForDate_(date);
   return { ok: true, date: date, employees: list };

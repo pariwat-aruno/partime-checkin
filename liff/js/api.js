@@ -1,4 +1,5 @@
 import { CONFIG } from './config.js';
+import { state } from './auth.js';
 
 /**
  * POST → Apps Script Web App
@@ -10,7 +11,7 @@ export const api = {
     const res = await fetch(CONFIG.API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action, payload }),
+      body: JSON.stringify({ action, payload, idToken: state.idToken }),
     });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
