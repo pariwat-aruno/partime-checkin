@@ -22,7 +22,7 @@
 - **Acceptance:**
   - [ ] sheet `Employees` มี header 11 column ตรงตาม CONTEXT
   - [ ] sheet `Checkins` มี header 12 column
-  - [ ] sheet `Payments` มี header 10 column
+  - [ ] sheet `Payments` มี header หลักและรองรับ column เงินพิเศษ/OT (`base_amount`, `extra_amount`, `ot_amount`, `adjustment_note`)
   - [ ] sheet `Logs` มี header 5 column
   - [ ] sheet `Config` มี 2 column (key, value)
   - [ ] copy Sheet ID เก็บไว้ใช้ TASK-09
@@ -186,12 +186,12 @@
 ### TASK-17: เขียน `Balance.gs` — getBalance()
 - **ทำ:** flow D handler (พาร์ทไทม์ดูยอด)
 - **Acceptance:**
-  - [ ] รับ `{lineUserId}`
+  - [ ] รับ `{lineUserId}` จาก LIFF idToken ที่ backend verify แล้ว
   - [ ] หา employee
   - [ ] sum wage จาก `Checkins` ที่ `status=approved` + `checkin_date` ในเดือนปัจจุบัน
   - [ ] count `pending` วันที่ค้างอยู่
   - [ ] อ่านรอบที่แล้วจาก `Payments`
-  - [ ] return `{ok:true, currentMonth:{full, half, total}, pendingDays, lastPayment:{period, total, status}}`
+  - [ ] return `{ok:true, currentMonth:{full, half, total}, pendingDays, lastPayment:{period, base, extra, ot, total, status}}`
 - **Depends on:** TASK-14
 
 ### TASK-18: เขียน `FlexCard.gs` — buildApprovalCard
@@ -218,13 +218,26 @@
 ### TASK-20: เขียน `Payment.gs` — closePeriod()
 - **ทำ:** flow D handler (เจ้าของปิดยอด)
 - **Acceptance:**
-  - [ ] รับ `{employeeId, period, isResign}` จาก postback หรือ menu command
+  - [ ] รับ `{employeeId, period, isResign, extraAmount, otAmount, adjustmentNote}` จาก Owner LIFF
   - [ ] sum approved checkins ในช่วง period
-  - [ ] count วัน pending → ถ้ามี > 0 push เตือนเจ้าของก่อน "ยังมี X วัน pending จะปิดยอดเลยไหม"
-  - [ ] insert row `Payments` status=`รอจ่าย` พร้อม `closed_at`
+  - [ ] count วัน pending → ถ้ามี > 0 และยังไม่ confirm ให้ return `has_pending`
+  - [ ] block duplicate employee+period ด้วย `payment_already_closed`
+  - [ ] insert row `Payments` status=`รอจ่าย` พร้อม `closed_at`, `base_amount`, `extra_amount`, `ot_amount`, `total_amount`, `adjustment_note`
   - [ ] note=`ลาออก` ถ้า `isResign=true`
   - [ ] push สรุปยอดหาเจ้าของ
+  - [ ] push แจ้งพาร์ทไทม์ว่าปิดยอดแล้วและสถานะ `รอจ่าย`
+  - [ ] ถ้า push หาพาร์ทไทม์ไม่สำเร็จ ให้ log และแจ้ง owner
 - **Depends on:** TASK-19
+
+### TASK-20B: เขียน payment actions เพิ่มเติม
+- **ทำ:** action สำหรับ owner กดจ่ายแล้ว / แก้กลับเป็นรอจ่าย / ดูประวัติรายคน
+- **Acceptance:**
+  - [ ] `markPaid({paymentId})` เปลี่ยน status=`จ่ายแล้ว`, set `paid_at`, push แจ้งพาร์ทไทม์
+  - [ ] `markPaid` ไม่ส่งซ้ำถ้า status เป็น `จ่ายแล้ว` อยู่แล้ว
+  - [ ] `restorePaymentPending({paymentId, reason})` เปลี่ยน status กลับเป็น `รอจ่าย`, clear `paid_at`, log เหตุผลใน `OwnerLogs`
+  - [ ] `getEmployeeHistory({employeeId, period})` return checkins + payments ของพาร์ทไทม์รายคน
+  - [ ] ทุก action verify owner จาก LIFF idToken
+- **Depends on:** TASK-20
 
 ---
 
@@ -259,7 +272,7 @@
   - [ ] ดึง userId → POST `getBalance`
   - [ ] แสดง: เดือนนี้ X วันเต็ม + Y ครึ่งวัน = Z บาท
   - [ ] แสดง: รออนุมัติ N วัน
-  - [ ] แสดง: รอบที่แล้ว — ยอด + สถานะ (รอจ่าย/จ่ายแล้ว)
+  - [ ] แสดง: รอบที่แล้ว — ยอด + breakdown เงินพิเศษ/OT + สถานะ (รอจ่าย/จ่ายแล้ว)
 - **Depends on:** TASK-17
 
 ### TASK-24: Host LIFF frontend
@@ -311,9 +324,12 @@
 - **ทำ:** ทดสอบหลังมี data > 5 วัน
 - **Acceptance:**
   - [ ] LIFF "ดูยอด" แสดงตัวเลขถูก
-  - [ ] ปิดยอดเดือนนี้ → row `Payments` เพิ่ม status=รอจ่าย
+  - [ ] ปิดยอดเดือนนี้ → row `Payments` เพิ่ม status=รอจ่าย พร้อม base/extra/OT/total
   - [ ] ปิดยอดตอนมี pending → เตือนเจ้าของ
-  - [ ] เปลี่ยน status เป็น `จ่ายแล้ว` ใน Sheet → LIFF ดูยอดเห็นการอัพเดต
+  - [ ] ปิดยอดซ้ำรอบเดิม → block
+  - [ ] owner กดจ่ายแล้ว → status=`จ่ายแล้ว`, พาร์ทไทม์ได้รับ LINE แจ้ง
+  - [ ] owner กดแก้เป็นรอจ่าย → status=`รอจ่าย`, clear paid_at, มี OwnerLogs
+  - [ ] หน้า Owner ปุ่มประวัติแสดง checkins + payments รายคน
 
 ---
 

@@ -32,6 +32,8 @@
 | ยอด | total / amount / payroll | ผลรวมค่าจ้างของพาร์ทไทม์ในรอบจ่าย 1 รอบ |
 | รอบจ่าย | period / pay-cycle | ช่วงเวลาที่รวมยอดจ่ายเงิน (รายเดือน หรือลาออก) |
 | ปิดยอด | close-period / payout | เจ้าของกดสรุปยอดของพาร์ทไทม์ในรอบนั้น |
+| เงินพิเศษ | extra payment / adjustment | เงินเพิ่มนอกเหนือจากค่าแรงปกติ ใส่ตอนปิดยอด |
+| เงิน OT | overtime payment | เงิน OT เพิ่มนอกเหนือจากค่าแรงปกติ ใส่ตอนปิดยอด |
 | รอจ่าย | unpaid / pending-payment | สถานะหลังปิดยอดแต่ยังไม่โอนเงิน |
 | จ่ายแล้ว | paid / settled | สถานะหลังเจ้าของโอนเงินและกดยืนยัน |
 | รัศมีหน้างาน | geofence / radius | พื้นที่รอบร้านที่เช็คอินได้ (default 150m) |
@@ -48,11 +50,12 @@
 | Role | จำนวน | ทำอะไรได้ | ทำไม่ได้ |
 |---|---|---|---|
 | พาร์ทไทม์ | หลายคน | ลงทะเบียนตัวเอง / เช็คอิน / ดูยอดของตัวเอง | ดูข้อมูลคนอื่น / กดอนุมัติ / กดจ่าย |
-| เจ้าของ | 1 คน | กดอนุมัติ (เต็ม/ครึ่ง/ไม่อนุมัติ) / ปิดยอด / กดจ่ายแล้ว / ดูทุกอย่าง | — |
+| เจ้าของ | 1+ คน | กดอนุมัติ (เต็ม/ครึ่ง/ไม่อนุมัติ) / ปิดยอด / ใส่เงินพิเศษและเงิน OT / กดจ่ายแล้ว / แก้กลับเป็นรอจ่าย / ดูทุกอย่าง | — |
 
 **กฎเข้าระบบ:**
 - พาร์ทไทม์ระบุตัวตนด้วย LINE User ID (ดึงอัตโนมัติจาก LIFF) ไม่มี password
-- เจ้าของเป็น LINE User ID เดียวที่ระบุไว้ใน Script Properties (`OWNER_LINE_USER_ID`) — flex card ส่งหาคนนี้คนเดียว
+- เจ้าของอ่านจาก `owner_line_user_ids` ใน Sheet `Config` แบบ comma-separated หรือ fallback เป็น Script Properties `OWNER_LINE_USER_ID`
+- LIFF API ต้องส่ง `idToken` และ Apps Script verify กับ LINE ก่อนใช้ `line_user_id` จริงจาก token
 
 ---
 
@@ -81,11 +84,19 @@
 | `checkin_id` | string | `CHK-20260509-0001` | running, primary key |
 | `employee_id` | string | `EMP-0001` | foreign key → Employees |
 | `checkin_date` | date | `2026-05-09` | ใช้เช็ค duplicate ต่อวัน |
-| `checkin_at` | datetime | `2026-05-09T08:15:23+07:00` | เวลาที่กดเช็คอิน |
-| `lat` | number | `13.7563` | GPS ที่เช็คอิน |
-| `lng` | number | `100.5018` | GPS ที่เช็คอิน |
-| `distance_m` | number | `45` | ระยะห่างจากพิกัดร้าน (m) |
-| `selfie_url` | string | Google Drive URL | selfie ของวันนั้น |
+| `slot1_at` | datetime | | เวลาเช็คอิน slot 1 |
+| `slot1_url` | string | Google Drive URL | selfie slot 1 |
+| `slot2_at` | datetime | | เวลาเช็คอิน slot 2 |
+| `slot2_url` | string | Google Drive URL | selfie slot 2 |
+| `slot3_at` | datetime | | เวลาเช็คอิน slot 3 |
+| `slot3_url` | string | Google Drive URL | selfie slot 3 |
+| `slot4_at` | datetime | | เวลาเช็คอิน slot 4 |
+| `slot4_url` | string | Google Drive URL | selfie slot 4 |
+| `last_lat` | number | `13.7563` | GPS ล่าสุด |
+| `last_lng` | number | `100.5018` | GPS ล่าสุด |
+| `last_distance_m` | number | `45` | ระยะล่าสุดจากพิกัดร้าน (m) |
+| `has_out_of_range` | boolean | `TRUE` | เคยมี slot อยู่นอกรัศมี |
+| `scan_count` | number | `4` | จำนวน slot ที่สแกนแล้ว |
 | `status` | enum | `pending` / `approved` / `rejected` | สถานะอนุมัติ |
 | `day_type` | enum | `full` / `half` / `none` | กำหนดตอนเจ้าของกดอนุมัติ |
 | `wage` | number | `400` / `200` / `0` | คำนวณตาม day_type |
@@ -100,11 +111,21 @@
 | `period` | string | `2026-05` หรือ `2026-05-resign` | รอบจ่าย |
 | `total_days_full` | number | `12` | จำนวนวันเต็ม |
 | `total_days_half` | number | `2` | จำนวนวันครึ่ง |
-| `total_amount` | number | `5200` | full×400 + half×200 |
+| `base_amount` | number | `5200` | ค่าแรงปกติจากวันเต็ม/ครึ่งวัน |
+| `extra_amount` | number | `500` | เงินพิเศษที่เจ้าของใส่ตอนปิดยอด |
+| `ot_amount` | number | `300` | เงิน OT ที่เจ้าของใส่ตอนปิดยอด |
+| `total_amount` | number | `6000` | base_amount + extra_amount + ot_amount |
 | `status` | enum | `รอจ่าย` / `จ่ายแล้ว` | |
 | `closed_at` | datetime | | เวลาที่เจ้าของกด "ปิดยอด" |
 | `paid_at` | datetime | nullable | เวลาที่เจ้าของกด "จ่ายแล้ว" |
-| `note` | string | nullable | เช่น "ลาออก", "หักล่วงหน้า 500" |
+| `adjustment_note` | string | nullable | เหตุผลของเงินพิเศษ/เงิน OT |
+| `note` | string | nullable | เช่น "ลาออก" |
+
+**กฎของ Payments:**
+- 1 พาร์ทไทม์ + 1 รอบจ่าย ปิดยอดซ้ำไม่ได้
+- กด `จ่ายแล้ว` แล้วระบบ push แจ้งพาร์ทไทม์
+- เจ้าของแก้กลับเป็น `รอจ่าย` ได้ แต่ต้องใส่เหตุผลและระบบบันทึก OwnerLogs
+- ถ้า push แจ้งพาร์ทไทม์ไม่สำเร็จ ระบบต้องแจ้งเจ้าของและ log ไว้
 
 ### Sheet: `Logs` (error log)
 
@@ -125,6 +146,26 @@
 | `geofence_lat` | `13.7563` | พิกัดร้าน |
 | `geofence_lng` | `100.5018` | พิกัดร้าน |
 | `geofence_radius_m` | `150` | รัศมี m |
+| `owner_line_user_ids` | `Uxxx,Uyyy` | LINE User ID เจ้าของหลายคน |
+| `slot1_until` | `11:00` | ก่อนเวลานี้เป็น slot 1 |
+| `slot2_until` | `13:00` | ก่อนเวลานี้เป็น slot 2 |
+| `slot3_until` | `17:00` | ก่อนเวลานี้เป็น slot 3 |
+| `slot1_label` | `เช้า` | ชื่อ slot |
+| `slot2_label` | `ก่อนพักเที่ยง` | ชื่อ slot |
+| `slot3_label` | `บ่ายโมง` | ชื่อ slot |
+| `slot4_label` | `เลิกงาน` | ชื่อ slot |
+
+### Sheet: `OwnerLogs` (บันทึกกิจกรรมเจ้าของ)
+
+| Column | Type | หมายเหตุ |
+|---|---|---|
+| `timestamp` | datetime | |
+| `owner_user_id` | string | LINE User ID เจ้าของที่ทำรายการ |
+| `owner_name` | string | ชื่อจาก LINE profile ถ้าดึงได้ |
+| `action` | enum | `approve_full` / `approve_half` / `reject` / `close_period` / `mark_paid` / `restore_pending` |
+| `target_id` | string | `checkin_id` หรือ `payment_id` |
+| `target_name` | string | ชื่อพาร์ทไทม์ |
+| `detail` | string | JSON string รายละเอียด |
 
 ---
 
@@ -132,7 +173,7 @@
 
 1. **ภาษา:** Comment ใน code = ไทย, ตัวแปร/function = อังกฤษ
 2. **Error handling:** ทุก function ของ Apps Script ต้อง try-catch + log ลง Sheet `Logs`
-3. **Idempotent:** เช็คอินซ้ำในวันเดียวกัน = ไม่สร้างแถวใหม่ (เช็ค `employee_id` + `checkin_date`)
+3. **Idempotent:** เช็คอินซ้ำ slot เดิมในวันเดียวกัน = ไม่ overwrite, ปิดยอดซ้ำรอบเดิม = block
 4. **Timeout:** Apps Script function ต้องจบภายใน 6 นาที
 5. **Secrets:** ใส่ใน Script Properties (`LINE_CHANNEL_ACCESS_TOKEN`, `OWNER_LINE_USER_ID`, `SHEET_ID`, `LIFF_ID`) ห้ามใส่ใน code
 6. **Time zone:** ทุก datetime เก็บเป็น `Asia/Bangkok` (ISO 8601 พร้อม offset `+07:00`)
@@ -141,7 +182,7 @@
    - Checkins: `CHK-YYYYMMDD-XXXX`
    - Payments: `PAY-YYYYMM-XXXX`
 8. **Image storage:** อัพรูปลง Google Drive folder เดียวกับ Sheet → เก็บ URL ลง Sheet (ห้ามเก็บ base64 ในเซลล์)
-9. **GPS check:** ใช้สูตร haversine คำนวณระยะ ถ้าเกิน `geofence_radius_m` → reject เช็คอิน
+9. **GPS check:** ใช้สูตร haversine คำนวณระยะ ถ้าเกิน `geofence_radius_m` → บันทึกได้แต่ flag ให้เจ้าของพิจารณา
 10. **Duplicate detection:** เช็ค `line_user_id` ซ้ำตอนลงทะเบียน (1 LINE = 1 พาร์ทไทม์)
 
 ---

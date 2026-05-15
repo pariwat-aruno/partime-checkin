@@ -20,13 +20,14 @@ graph TD
     LINE[LINE Messaging API]
 
     PT -->|กดปุ่ม rich menu| LIFF
-    LIFF -->|POST register/checkin| APPS
+    LIFF -->|POST action + LIFF idToken| APPS
     APPS -->|insert/update| SHEET
     APPS -->|upload images| DRIVE
     APPS -->|push flex card| LINE
     LINE -->|ส่ง flex card| OWNER
-    OWNER -->|กดอนุมัติ/ปิดยอด/จ่าย| LINE
+    OWNER -->|กดอนุมัติผ่าน LINE| LINE
     LINE -->|webhook postback| APPS
+    OWNER -->|ปิดยอด/จ่าย/ประวัติ| LIFF
 
     style SHEET fill:#34a853,color:#fff
     style DRIVE fill:#fbbc04,color:#000
@@ -50,8 +51,8 @@ graph TD
 | # | Step | ใครทำ | ข้อมูลที่ส่ง | ปลายทาง |
 |---|------|-------|-----------|--------|
 | 1 | กด rich menu "ลงทะเบียน" | พาร์ทไทม์ | — | เปิด LIFF |
-| 2 | กรอกฟอร์ม + ถ่าย selfie + บัตร | พาร์ทไทม์ | ชื่อ, เบอร์, บัญชี, รูป 2 รูป + LINE userId (auto) | LIFF |
-| 3 | submit | LIFF | JSON + base64 images | Apps Script `doPost` |
+| 2 | กรอกฟอร์ม + ถ่าย selfie + บัตร | พาร์ทไทม์ | ชื่อ, เบอร์, บัญชี, รูป 2 รูป + LIFF idToken | LIFF |
+| 3 | submit | LIFF | JSON + base64 images + idToken | Apps Script `doPost` |
 | 4 | validate + เช็ค `line_user_id` ซ้ำ | Apps Script | — | — |
 | 5 | upload รูป | Apps Script | 2 รูป | Google Drive |
 | 6 | insert row + gen `employee_id` | Apps Script | row | Sheet `Employees` |
@@ -62,14 +63,14 @@ graph TD
 | # | Step | ใครทำ | ข้อมูลที่ส่ง | ปลายทาง |
 |---|------|-------|-----------|--------|
 | 1 | กด rich menu "เช็คอิน" | พาร์ทไทม์ | — | เปิด LIFF |
-| 2 | LIFF ขอ GPS + เปิดกล้องถ่าย selfie | LIFF | — | — |
-| 3 | submit | LIFF | lat, lng, selfie + LINE userId | Apps Script |
+| 2 | LIFF ขอ GPS + เปิดกล้องถ่าย selfie | LIFF | auto-detect slot 1-4 | — |
+| 3 | submit | LIFF | lat, lng, selfie, slot + idToken | Apps Script |
 | 4 | คำนวณ haversine vs `geofence_lat/lng` | Apps Script | — | — |
-| 5 | ถ้าเกิน radius → reject + แจ้งกลับ | Apps Script | error | LIFF |
-| 6 | ถ้าผ่าน + เช็ค duplicate วันเดียวกัน | Apps Script | — | Sheet `Checkins` |
+| 5 | ถ้าเกิน radius → บันทึกได้แต่ flag `has_out_of_range` | Apps Script | warning flag | Sheet |
+| 6 | เช็ค duplicate slot เดิมในวันเดียวกัน | Apps Script | — | Sheet `Checkins` |
 | 7 | upload selfie | Apps Script | รูป | Google Drive |
-| 8 | insert row status = `pending` | Apps Script | row | Sheet `Checkins` |
-| 9 | push flex card หาเจ้าของ | Apps Script | flex JSON | LINE → เจ้าของ |
+| 8 | update slot N + scan_count, status=`pending` | Apps Script | row | Sheet `Checkins` |
+| 9 | push progress card หาเจ้าของทุก slot และ approval card เมื่อครบ 4 slot | Apps Script | flex JSON | LINE → เจ้าของ |
 
 ### Flow C: เจ้าของอนุมัติ
 
@@ -87,9 +88,14 @@ graph TD
 | 1 | พาร์ทไทม์เปิด LIFF "ดูยอด" | พาร์ทไทม์ | LINE userId | Apps Script |
 | 2 | sum `wage` จาก `Checkins` ที่ status=approved เดือนปัจจุบัน | Apps Script | — | — |
 | 3 | แสดงผล + รายการรอบที่แล้ว | Apps Script | JSON | LIFF |
-| 4 | เจ้าของกดเมนู "ปิดยอด [คน]" | เจ้าของ | postback | Apps Script |
-| 5 | สร้างแถว `Payments` status=`รอจ่าย` | Apps Script | row | Sheet `Payments` |
-| 6 | เจ้าของแก้ `status` = `จ่ายแล้ว` ใน Sheet manual | เจ้าของ | — | Sheet `Payments` |
+| 4 | เจ้าของเปิด LIFF Owner และกดปิดยอด | เจ้าของ | employeeId, period, เงินพิเศษ, เงิน OT, note | Apps Script |
+| 5 | ถ้ามี pending และยังไม่ confirm → block + แจ้งเตือน | Apps Script | error `has_pending` | LIFF |
+| 6 | ถ้า employee+period เคยปิดแล้ว → block | Apps Script | error `payment_already_closed` | LIFF |
+| 7 | สร้างแถว `Payments` status=`รอจ่าย` พร้อม breakdown | Apps Script | row | Sheet `Payments` |
+| 8 | push แจ้งพาร์ทไทม์ว่า “ปิดยอดแล้ว / รอจ่าย” | Apps Script | text | LINE → พาร์ทไทม์ |
+| 9 | เจ้าของกด `ทำเครื่องหมายจ่ายแล้ว` | เจ้าของ | paymentId | Apps Script |
+| 10 | update `Payments` status=`จ่ายแล้ว`, `paid_at` และ push แจ้งพาร์ทไทม์ | Apps Script | row + text | Sheet + LINE |
+| 11 | ถ้ากดผิด เจ้าของกด `แก้เป็นรอจ่าย` พร้อมเหตุผล | เจ้าของ | paymentId, reason | Apps Script + OwnerLogs |
 
 ---
 
@@ -114,7 +120,7 @@ graph TD
 - [ ] **Step 11:** ทดสอบ Flow A (ลงทะเบียน) ด้วย dummy account
 - [ ] **Step 12:** ทดสอบ Flow B (เช็คอิน) ใน-นอกรัศมี
 - [ ] **Step 13:** ทดสอบ Flow C (อนุมัติทั้ง 3 ปุ่ม)
-- [ ] **Step 14:** ทดสอบ Flow D (ปิดยอด + อัพเดต `จ่ายแล้ว`)
+- [ ] **Step 14:** ทดสอบ Flow D (ปิดยอด + เงินพิเศษ/OT + จ่ายแล้ว + แก้กลับรอจ่าย)
 
 ---
 
@@ -128,7 +134,10 @@ graph TD
 | เช็คอินซ้ำวันเดียวกัน | ไม่สร้างแถวใหม่ + return แถวเดิม | Apps Script `checkin()` (เช็ค employee_id + checkin_date) |
 | เจ้าของไม่กดอนุมัติ | row ค้าง `pending` ตลอด, นับยอดเฉพาะ approved | Apps Script `getBalance()` |
 | ลาออกแล้ว LINE userId เดิมเช็คอินอีก | block ที่ `is_active=FALSE` | Apps Script `checkin()` |
-| ปิดยอดแต่มี pending ค้าง | flex card เตือน "ยังมี X วัน pending จะปิดยอดเลยไหม" | Apps Script `closePeriod()` |
+| ปิดยอดแต่มี pending ค้าง | LIFF Owner เตือน "ยังมี X วัน pending" และต้องกดปิดแบบ confirm | Apps Script `closePeriod()` |
+| ปิดยอดซ้ำ employee+period | block ด้วย `payment_already_closed` | Apps Script `closePeriod()` |
+| owner กดจ่ายผิด | กด `แก้เป็นรอจ่าย` พร้อมเหตุผล, log ลง OwnerLogs, แจ้งพาร์ทไทม์ | Apps Script `restorePaymentPending()` |
+| LINE push หาพาร์ทไทม์ไม่สำเร็จ | log + push แจ้ง owner | Apps Script `notifyEmployee...()` |
 | Apps Script timeout 6 นาที | upload รูปทีละไฟล์ + jobs ที่หนักส่งต่อ n8n queue | Apps Script try-catch + log |
 | LINE push fail | log ลง Sheet `Logs` + retry 3 ครั้ง exponential backoff | Apps Script `pushLine()` helper |
 | รูปใหญ่เกินขีด LIFF | resize ใน frontend ก่อน base64 encode | LIFF frontend |
