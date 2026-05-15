@@ -43,6 +43,7 @@
         <div>
           <div id="last-period" style="font-weight:600">—</div>
           <div class="meta" id="last-amount">—</div>
+          <div class="meta" id="last-breakdown"></div>
         </div>
         <div id="last-status" class="status">—</div>
       </div>
@@ -82,6 +83,12 @@
           document.getElementById('last-payment-row').style.display = 'flex';
           document.getElementById('last-period').textContent = 'รอบ ' + result.lastPayment.period;
           document.getElementById('last-amount').textContent = result.lastPayment.total.toLocaleString() + ' บาท';
+          const parts = [];
+          if (result.lastPayment.base) parts.push('ปกติ ' + result.lastPayment.base.toLocaleString());
+          if (result.lastPayment.extra) parts.push('พิเศษ ' + result.lastPayment.extra.toLocaleString());
+          if (result.lastPayment.ot) parts.push('OT ' + result.lastPayment.ot.toLocaleString());
+          if (result.lastPayment.adjustmentNote) parts.push(result.lastPayment.adjustmentNote);
+          document.getElementById('last-breakdown').textContent = parts.join(' • ');
           const statusEl = document.getElementById('last-status');
           statusEl.textContent = result.lastPayment.status;
           statusEl.className = 'status ' + result.lastPayment.status;

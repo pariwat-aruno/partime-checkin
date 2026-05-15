@@ -67,6 +67,8 @@ function routeAction_(action, payload) {
     case 'approveCheckin':        return approveCheckin(payload);
     case 'closePeriod':           return closePeriod(payload);
     case 'markPaid':              return markPaid(payload);
+    case 'restorePaymentPending': return restorePaymentPending(payload);
+    case 'getEmployeeHistory':    return getEmployeeHistory(payload);
     case 'getOwnerLogs':          return getOwnerLogs(payload);
     default:
       return { ok: false, error: 'unknown_action', action: action };

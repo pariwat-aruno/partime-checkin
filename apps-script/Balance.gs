@@ -84,15 +84,20 @@ function countPendingCheckins_(ss, employeeId) {
 
 function findLastPayment_(ss, employeeId) {
   const sh = ss.getSheetByName('Payments');
+  ensurePaymentExtraColumns_(sh);
   const last = sh.getLastRow();
   if (last < 2) return null;
   const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
   const data = sh.getRange(2, 1, last - 1, sh.getLastColumn()).getValues();
   const iEmp = headers.indexOf('employee_id');
   const iPeriod = headers.indexOf('period');
+  const iBase = headers.indexOf('base_amount');
+  const iExtra = headers.indexOf('extra_amount');
+  const iOt = headers.indexOf('ot_amount');
   const iAmount = headers.indexOf('total_amount');
   const iStatus = headers.indexOf('status');
   const iClosed = headers.indexOf('closed_at');
+  const iAdjNote = headers.indexOf('adjustment_note');
 
   let last_ = null;
   data.forEach(function (row) {
@@ -100,8 +105,12 @@ function findLastPayment_(ss, employeeId) {
     if (!last_ || String(row[iClosed]) > String(last_._closed)) {
       last_ = {
         period: row[iPeriod],
+        base: Number(row[iBase] || 0),
+        extra: Number(row[iExtra] || 0),
+        ot: Number(row[iOt] || 0),
         total: Number(row[iAmount] || 0),
         status: row[iStatus],
+        adjustmentNote: iAdjNote >= 0 ? row[iAdjNote] : '',
         _closed: row[iClosed],
       };
     }

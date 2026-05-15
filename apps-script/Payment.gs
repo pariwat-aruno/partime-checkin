@@ -45,30 +45,47 @@ function closePeriod(payload) {
       return { ok: false, error: 'has_pending', pending: stats.pending };
     }
 
+    const sh = ss.getSheetByName('Payments');
+    ensurePaymentExtraColumns_(sh);
+    const duplicate = findPaymentForEmployeePeriod_(sh, emp.employee_id, period);
+    if (duplicate) {
+      return { ok: false, error: 'payment_already_closed', paymentId: duplicate.payment_id };
+    }
+
+    const extras = normalizePaymentExtras_(payload);
+    const baseAmount = stats.total;
+    const totalAmount = baseAmount + extras.extraAmount + extras.otAmount;
+
     // gen payment_id + insert
     const paymentId = nextPaymentId(period);
-    const sh = ss.getSheetByName('Payments');
-    // header: payment_id, employee_id, period, total_days_full, total_days_half, total_amount, status, closed_at, paid_at, note
-    sh.appendRow([
-      paymentId,
-      emp.employee_id,
-      period,
-      stats.full,
-      stats.half,
-      stats.total,
-      'รอจ่าย',
-      nowBangkok(),
-      '',
-      payload.isResign ? 'ลาออก' : '',
-    ]);
+    appendPaymentRow_(sh, {
+      payment_id: paymentId,
+      employee_id: emp.employee_id,
+      period: period,
+      total_days_full: stats.full,
+      total_days_half: stats.half,
+      base_amount: baseAmount,
+      extra_amount: extras.extraAmount,
+      ot_amount: extras.otAmount,
+      total_amount: totalAmount,
+      status: 'รอจ่าย',
+      closed_at: nowBangkok(),
+      paid_at: '',
+      adjustment_note: extras.note,
+      note: payload.isResign ? 'ลาออก' : '',
+    });
 
-    logInfo('closePeriod', 'created payment', { paymentId: paymentId, employeeId: emp.employee_id, total: stats.total });
+    logInfo('closePeriod', 'created payment', { paymentId: paymentId, employeeId: emp.employee_id, total: totalAmount });
 
     logOwnerAction(payload.lineUserId, 'close_period', paymentId, emp.display_name, {
       period: period,
       days_full: stats.full,
       days_half: stats.half,
-      total: stats.total,
+      base_amount: baseAmount,
+      extra_amount: extras.extraAmount,
+      ot_amount: extras.otAmount,
+      total: totalAmount,
+      adjustment_note: extras.note,
       is_resign: !!payload.isResign,
     });
 
@@ -78,18 +95,35 @@ function closePeriod(payload) {
       text: 'ปิดยอดสำเร็จ — บริษัท วอร์ด้า สกินแคร์ จำกัด\n' +
         emp.display_name + ' (' + emp.employee_id + ')\n' +
         'รอบ ' + period + '\n' +
-        stats.full + ' วันเต็ม + ' + stats.half + ' วันครึ่ง = ' + stats.total + ' บาท\n' +
+        stats.full + ' วันเต็ม + ' + stats.half + ' วันครึ่ง = ' + formatBaht_(baseAmount) + '\n' +
+        (extras.extraAmount ? 'เงินพิเศษ: ' + formatBaht_(extras.extraAmount) + '\n' : '') +
+        (extras.otAmount ? 'เงิน OT: ' + formatBaht_(extras.otAmount) + '\n' : '') +
+        'ยอดรวม: ' + formatBaht_(totalAmount) + '\n' +
         'สถานะ: รอจ่าย'
     }]);
 
-    notifyEmployeePeriodClosed_(emp, period, stats, paymentId);
+    const notified = notifyEmployeePeriodClosed_(emp, period, stats, {
+      paymentId: paymentId,
+      baseAmount: baseAmount,
+      extraAmount: extras.extraAmount,
+      otAmount: extras.otAmount,
+      totalAmount: totalAmount,
+      note: extras.note,
+    });
+    if (!notified) {
+      pushToAllOwners([{ type: 'text', text: 'แจ้งเตือน: ปิดยอดแล้ว แต่ส่งข้อความหาพนักงานไม่สำเร็จ\n' + emp.display_name + ' (' + emp.employee_id + ')\n' + paymentId }]);
+    }
 
     return {
       ok: true,
       paymentId: paymentId,
-      total: stats.total,
+      total: totalAmount,
+      baseAmount: baseAmount,
+      extraAmount: extras.extraAmount,
+      otAmount: extras.otAmount,
       daysFull: stats.full,
       daysHalf: stats.half,
+      employeeNotified: notified,
     };
   } finally {
     lock.releaseLock();
@@ -146,31 +180,86 @@ function sumApprovedAndPending_(ss, employeeId, monthStr) {
   return { full: full, half: half, total: total, pending: pending };
 }
 
-function notifyEmployeePeriodClosed_(emp, period, stats, paymentId) {
+function normalizePaymentExtras_(payload) {
+  const extraAmount = Math.max(0, Number((payload && payload.extraAmount) || 0));
+  const otAmount = Math.max(0, Number((payload && payload.otAmount) || 0));
+  const note = String((payload && payload.adjustmentNote) || '').trim();
+  return {
+    extraAmount: isFinite(extraAmount) ? extraAmount : 0,
+    otAmount: isFinite(otAmount) ? otAmount : 0,
+    note: note,
+  };
+}
+
+function ensurePaymentExtraColumns_(sh) {
+  const required = ['base_amount', 'extra_amount', 'ot_amount', 'adjustment_note'];
+  const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+  required.forEach(function (h) {
+    if (headers.indexOf(h) >= 0) return;
+    sh.getRange(1, sh.getLastColumn() + 1).setValue(h);
+    headers.push(h);
+  });
+}
+
+function appendPaymentRow_(sh, values) {
+  const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+  sh.appendRow(headers.map(function (h) {
+    return values[h] == null ? '' : values[h];
+  }));
+}
+
+function findPaymentForEmployeePeriod_(sh, employeeId, period) {
+  const last = sh.getLastRow();
+  if (last < 2) return null;
+  const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+  const data = sh.getRange(2, 1, last - 1, sh.getLastColumn()).getValues();
+  const iPid = headers.indexOf('payment_id');
+  const iEmp = headers.indexOf('employee_id');
+  const iPeriod = headers.indexOf('period');
+  const iStatus = headers.indexOf('status');
+  for (let i = 0; i < data.length; i++) {
+    if (data[i][iEmp] === employeeId && data[i][iPeriod] === period) {
+      return {
+        payment_id: data[i][iPid],
+        status: data[i][iStatus],
+        _rowNumber: i + 2,
+      };
+    }
+  }
+  return null;
+}
+
+function notifyEmployeePeriodClosed_(emp, period, stats, payment) {
   if (!emp || !emp.line_user_id) {
     logWarn('notifyEmployeePeriodClosed', 'employee has no line_user_id', {
       employeeId: emp && emp.employee_id,
-      paymentId: paymentId,
+      paymentId: payment && payment.paymentId,
     });
-    return;
+    return false;
   }
 
   try {
-    pushText(emp.line_user_id,
+    const res = pushText(emp.line_user_id,
       'บริษัท วอร์ด้า สกินแคร์ จำกัด\n\n' +
       'ปิดยอดค่าจ้างเรียบร้อยแล้ว\n' +
       'รอบ: ' + period + '\n' +
-      'รหัสรายการ: ' + paymentId + '\n' +
+      'รหัสรายการ: ' + payment.paymentId + '\n' +
       'วันเต็ม: ' + stats.full + ' วัน\n' +
       'ครึ่งวัน: ' + stats.half + ' วัน\n' +
-      'ยอดรวม: ' + formatBaht_(stats.total) + '\n' +
+      'ค่าแรงปกติ: ' + formatBaht_(payment.baseAmount) + '\n' +
+      (payment.extraAmount ? 'เงินพิเศษ: ' + formatBaht_(payment.extraAmount) + '\n' : '') +
+      (payment.otAmount ? 'เงิน OT: ' + formatBaht_(payment.otAmount) + '\n' : '') +
+      (payment.note ? 'หมายเหตุ: ' + payment.note + '\n' : '') +
+      'ยอดรวม: ' + formatBaht_(payment.totalAmount) + '\n' +
       'สถานะ: รอจ่าย\n\n' +
       'เมื่อบริษัทโอนเงินแล้ว ระบบจะแจ้งให้ทราบอีกครั้ง');
+    return res && res.ok === true;
   } catch (err) {
     logWarn('notifyEmployeePeriodClosed', 'push failed: ' + err.message, {
       employeeId: emp.employee_id,
-      paymentId: paymentId,
+      paymentId: payment && payment.paymentId,
     });
+    return false;
   }
 }
 
@@ -180,11 +269,11 @@ function notifyEmployeePaid_(emp, period, total, paymentId) {
       employeeId: emp && emp.employee_id,
       paymentId: paymentId,
     });
-    return;
+    return false;
   }
 
   try {
-    pushText(emp.line_user_id,
+    const res = pushText(emp.line_user_id,
       'บริษัท วอร์ด้า สกินแคร์ จำกัด\n\n' +
       'โอนค่าจ้างเรียบร้อยแล้ว\n' +
       'รอบ: ' + period + '\n' +
@@ -192,11 +281,13 @@ function notifyEmployeePaid_(emp, period, total, paymentId) {
       'ยอดโอน: ' + formatBaht_(total) + '\n' +
       'สถานะ: จ่ายแล้ว\n\n' +
       'สามารถกดเมนู "ดูยอด" เพื่อตรวจสอบสถานะล่าสุดได้');
+    return res && res.ok === true;
   } catch (err) {
     logWarn('notifyEmployeePaid', 'push failed: ' + err.message, {
       employeeId: emp.employee_id,
       paymentId: paymentId,
     });
+    return false;
   }
 }
 

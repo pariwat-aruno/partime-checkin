@@ -74,6 +74,7 @@ function getOwnerDashboard(payload) {
 
   // payments ของเดือนนี้
   const paySh = ss.getSheetByName('Payments');
+  ensurePaymentExtraColumns_(paySh);
   const payMap = {}; // employee_id → {payment_id, total_amount, status, closed_at, paid_at}
   const pl = paySh.getLastRow();
   if (pl >= 2) {
@@ -82,19 +83,27 @@ function getOwnerDashboard(payload) {
     const iPid = ph.indexOf('payment_id');
     const iEmp = ph.indexOf('employee_id');
     const iPeriod = ph.indexOf('period');
+    const iBase = ph.indexOf('base_amount');
+    const iExtra = ph.indexOf('extra_amount');
+    const iOt = ph.indexOf('ot_amount');
     const iAmount = ph.indexOf('total_amount');
     const iStatus = ph.indexOf('status');
     const iClosed = ph.indexOf('closed_at');
     const iPaid = ph.indexOf('paid_at');
+    const iAdjNote = ph.indexOf('adjustment_note');
     pd.forEach(function (row) {
       // รับทั้ง 'YYYY-MM' และ 'YYYY-MM-resign'
       if (String(row[iPeriod]).indexOf(period) !== 0) return;
       payMap[row[iEmp]] = {
         payment_id: row[iPid],
+        base_amount: Number(row[iBase] || 0),
+        extra_amount: Number(row[iExtra] || 0),
+        ot_amount: Number(row[iOt] || 0),
         total_amount: Number(row[iAmount] || 0),
         status: row[iStatus],
         closed_at: row[iClosed] ? formatBangkokDateTime__(row[iClosed]) : '',
         paid_at: row[iPaid] ? formatBangkokDateTime__(row[iPaid]) : '',
+        adjustment_note: iAdjNote >= 0 ? row[iAdjNote] : '',
       };
     });
   }
@@ -126,6 +135,7 @@ function markPaid(payload) {
 
   const sheetId = PropertiesService.getScriptProperties().getProperty('SHEET_ID');
   const sh = SpreadsheetApp.openById(sheetId).getSheetByName('Payments');
+  ensurePaymentExtraColumns_(sh);
   const last = sh.getLastRow();
   if (last < 2) return { ok: false, error: 'payment_not_found' };
 
@@ -161,9 +171,80 @@ function markPaid(payload) {
     total: Number(rowVals[iAmount] || 0),
   });
 
-  notifyEmployeePaid_(emp, rowVals[iPeriod], Number(rowVals[iAmount] || 0), payload.paymentId);
+  const notified = notifyEmployeePaid_(emp, rowVals[iPeriod], Number(rowVals[iAmount] || 0), payload.paymentId);
+  if (!notified) {
+    pushToAllOwners([{ type: 'text', text: 'แจ้งเตือน: บันทึกจ่ายแล้ว แต่ส่งข้อความหาพนักงานไม่สำเร็จ\n' + empName + '\n' + payload.paymentId }]);
+  }
 
-  return { ok: true };
+  return { ok: true, employeeNotified: notified };
+}
+
+/**
+ * แก้ Payments status จ่ายแล้ว → รอจ่าย (+ clear paid_at)
+ *
+ * input: { lineUserId, paymentId, reason }
+ */
+function restorePaymentPending(payload) {
+  if (!isOwner(payload && payload.lineUserId)) return { ok: false, error: 'not_owner' };
+  if (!payload.paymentId) return { ok: false, error: 'missing_paymentId' };
+  const reason = String((payload && payload.reason) || '').trim();
+  if (!reason) return { ok: false, error: 'missing_reason' };
+
+  const sheetId = PropertiesService.getScriptProperties().getProperty('SHEET_ID');
+  const sh = SpreadsheetApp.openById(sheetId).getSheetByName('Payments');
+  ensurePaymentExtraColumns_(sh);
+  const last = sh.getLastRow();
+  if (last < 2) return { ok: false, error: 'payment_not_found' };
+
+  const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+  const data = sh.getRange(2, 1, last - 1, sh.getLastColumn()).getValues();
+  const iPid = headers.indexOf('payment_id');
+  const iStatus = headers.indexOf('status');
+  const iPaid = headers.indexOf('paid_at');
+  const iEmp = headers.indexOf('employee_id');
+  const iPeriod = headers.indexOf('period');
+  const iAmount = headers.indexOf('total_amount');
+
+  let rowIdx = -1;
+  let rowVals = null;
+  for (let i = 0; i < data.length; i++) {
+    if (data[i][iPid] === payload.paymentId) {
+      rowIdx = i + 2;
+      rowVals = data[i];
+      break;
+    }
+  }
+  if (rowIdx < 0) return { ok: false, error: 'payment_not_found' };
+  if (rowVals[iStatus] !== 'จ่ายแล้ว') return { ok: false, error: 'not_paid' };
+
+  sh.getRange(rowIdx, iStatus + 1).setValue('รอจ่าย');
+  sh.getRange(rowIdx, iPaid + 1).setValue('');
+
+  const emp = findEmployeeById_(rowVals[iEmp]);
+  const empName = emp ? emp.display_name : rowVals[iEmp];
+  logOwnerAction(payload.lineUserId, 'restore_pending', payload.paymentId, empName, {
+    period: rowVals[iPeriod],
+    total: Number(rowVals[iAmount] || 0),
+    reason: reason,
+  });
+
+  let notified = false;
+  if (emp && emp.line_user_id) {
+    const res = pushText(emp.line_user_id,
+      'บริษัท วอร์ด้า สกินแคร์ จำกัด\n\n' +
+      'มีการแก้ไขสถานะการจ่ายเงิน\n' +
+      'รอบ: ' + rowVals[iPeriod] + '\n' +
+      'รหัสรายการ: ' + payload.paymentId + '\n' +
+      'ยอด: ' + formatBaht_(Number(rowVals[iAmount] || 0)) + '\n' +
+      'สถานะใหม่: รอจ่าย\n' +
+      'เหตุผล: ' + reason);
+    notified = res && res.ok === true;
+  }
+  if (!notified) {
+    pushToAllOwners([{ type: 'text', text: 'แจ้งเตือน: แก้สถานะเป็นรอจ่ายแล้ว แต่ส่งข้อความหาพนักงานไม่สำเร็จ\n' + empName + '\n' + payload.paymentId }]);
+  }
+
+  return { ok: true, employeeNotified: notified };
 }
 
 function formatBangkokDateTime__(d) {
@@ -256,6 +337,130 @@ function approveCheckin(payload) {
   if (!payload.checkinId || !payload.action) return { ok: false, error: 'missing_fields' };
   // updateCheckinStatus_ อยู่ใน WebApp.gs (shared namespace)
   return updateCheckinStatus_(payload.checkinId, payload.action, payload.type, payload.lineUserId);
+}
+
+/**
+ * ประวัติรายคนในรอบที่เลือก
+ * input: { lineUserId, employeeId, period }
+ */
+function getEmployeeHistory(payload) {
+  if (!isOwner(payload && payload.lineUserId)) return { ok: false, error: 'not_owner' };
+  if (!payload.employeeId) return { ok: false, error: 'missing_employeeId' };
+  const period = (payload && payload.period) || thisMonthBangkok();
+
+  const emp = findEmployeeById_(payload.employeeId);
+  if (!emp) return { ok: false, error: 'employee_not_found' };
+
+  const sheetId = PropertiesService.getScriptProperties().getProperty('SHEET_ID');
+  const ss = SpreadsheetApp.openById(sheetId);
+  const checkins = listEmployeeCheckinsForPeriod_(ss, payload.employeeId, period);
+  const payments = listEmployeePaymentsForPeriod_(ss, payload.employeeId, period);
+  return {
+    ok: true,
+    employeeId: payload.employeeId,
+    displayName: emp.display_name,
+    period: period,
+    checkins: checkins,
+    payments: payments,
+  };
+}
+
+function listEmployeeCheckinsForPeriod_(ss, employeeId, period) {
+  const sh = ss.getSheetByName('Checkins');
+  const last = sh.getLastRow();
+  if (last < 2) return [];
+  const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+  const data = sh.getRange(2, 1, last - 1, sh.getLastColumn()).getValues();
+  const iId = headers.indexOf('checkin_id');
+  const iEmp = headers.indexOf('employee_id');
+  const iDate = headers.indexOf('checkin_date');
+  const iStatus = headers.indexOf('status');
+  const iDayType = headers.indexOf('day_type');
+  const iWage = headers.indexOf('wage');
+  const iScan = headers.indexOf('scan_count');
+  const iDist = headers.indexOf('last_distance_m');
+  const iOOR = headers.indexOf('has_out_of_range');
+  const slotIdx = [1, 2, 3, 4].map(function (s) {
+    return { at: headers.indexOf('slot' + s + '_at'), url: headers.indexOf('slot' + s + '_url') };
+  });
+
+  const items = [];
+  data.forEach(function (row) {
+    if (row[iEmp] !== employeeId) return;
+    const date = formatSheetDate_(row[iDate], 'yyyy-MM-dd');
+    if (date.substring(0, 7) !== period) return;
+    items.push({
+      checkin_id: row[iId],
+      date: date,
+      status: row[iStatus],
+      day_type: row[iDayType],
+      wage: Number(row[iWage] || 0),
+      scan_count: Number(row[iScan] || 0),
+      last_distance_m: Number(row[iDist] || 0),
+      has_out_of_range: row[iOOR] === true,
+      slots: slotIdx.map(function (sc, i) {
+        const at = row[sc.at];
+        const url = row[sc.url];
+        return {
+          slot: i + 1,
+          at: at ? formatSheetDate_(at, 'HH:mm') : '',
+          thumb: url ? driveThumbnail__(url) : '',
+          completed: !!at,
+        };
+      }),
+    });
+  });
+  items.sort(function (a, b) { return String(a.date).localeCompare(String(b.date)); });
+  return items;
+}
+
+function listEmployeePaymentsForPeriod_(ss, employeeId, period) {
+  const sh = ss.getSheetByName('Payments');
+  ensurePaymentExtraColumns_(sh);
+  const last = sh.getLastRow();
+  if (last < 2) return [];
+  const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+  const data = sh.getRange(2, 1, last - 1, sh.getLastColumn()).getValues();
+  const iPid = headers.indexOf('payment_id');
+  const iEmp = headers.indexOf('employee_id');
+  const iPeriod = headers.indexOf('period');
+  const iBase = headers.indexOf('base_amount');
+  const iExtra = headers.indexOf('extra_amount');
+  const iOt = headers.indexOf('ot_amount');
+  const iAmount = headers.indexOf('total_amount');
+  const iStatus = headers.indexOf('status');
+  const iClosed = headers.indexOf('closed_at');
+  const iPaid = headers.indexOf('paid_at');
+  const iAdjNote = headers.indexOf('adjustment_note');
+  const iNote = headers.indexOf('note');
+  const items = [];
+  data.forEach(function (row) {
+    if (row[iEmp] !== employeeId) return;
+    if (String(row[iPeriod]).indexOf(period) !== 0) return;
+    items.push({
+      payment_id: row[iPid],
+      period: row[iPeriod],
+      base_amount: Number(row[iBase] || 0),
+      extra_amount: Number(row[iExtra] || 0),
+      ot_amount: Number(row[iOt] || 0),
+      total_amount: Number(row[iAmount] || 0),
+      status: row[iStatus],
+      closed_at: row[iClosed] ? formatBangkokDateTime__(row[iClosed]) : '',
+      paid_at: row[iPaid] ? formatBangkokDateTime__(row[iPaid]) : '',
+      adjustment_note: iAdjNote >= 0 ? row[iAdjNote] : '',
+      note: iNote >= 0 ? row[iNote] : '',
+    });
+  });
+  return items;
+}
+
+function formatSheetDate_(value, pattern) {
+  if (value instanceof Date) return Utilities.formatDate(value, 'Asia/Bangkok', pattern);
+  const s = String(value || '');
+  if (pattern === 'yyyy-MM-dd') return s.substring(0, 10);
+  const d = new Date(s);
+  if (!isNaN(d.getTime())) return Utilities.formatDate(d, 'Asia/Bangkok', pattern);
+  return s;
 }
 
 function driveThumbnail__(url) {
