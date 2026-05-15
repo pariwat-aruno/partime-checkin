@@ -82,6 +82,8 @@ function closePeriod(payload) {
         'สถานะ: รอจ่าย'
     }]);
 
+    notifyEmployeePeriodClosed_(emp, period, stats, paymentId);
+
     return {
       ok: true,
       paymentId: paymentId,
@@ -142,4 +144,62 @@ function sumApprovedAndPending_(ss, employeeId, monthStr) {
     }
   });
   return { full: full, half: half, total: total, pending: pending };
+}
+
+function notifyEmployeePeriodClosed_(emp, period, stats, paymentId) {
+  if (!emp || !emp.line_user_id) {
+    logWarn('notifyEmployeePeriodClosed', 'employee has no line_user_id', {
+      employeeId: emp && emp.employee_id,
+      paymentId: paymentId,
+    });
+    return;
+  }
+
+  try {
+    pushText(emp.line_user_id,
+      'บริษัท วอร์ด้า สกินแคร์ จำกัด\n\n' +
+      'ปิดยอดค่าจ้างเรียบร้อยแล้ว\n' +
+      'รอบ: ' + period + '\n' +
+      'รหัสรายการ: ' + paymentId + '\n' +
+      'วันเต็ม: ' + stats.full + ' วัน\n' +
+      'ครึ่งวัน: ' + stats.half + ' วัน\n' +
+      'ยอดรวม: ' + formatBaht_(stats.total) + '\n' +
+      'สถานะ: รอจ่าย\n\n' +
+      'เมื่อบริษัทโอนเงินแล้ว ระบบจะแจ้งให้ทราบอีกครั้ง');
+  } catch (err) {
+    logWarn('notifyEmployeePeriodClosed', 'push failed: ' + err.message, {
+      employeeId: emp.employee_id,
+      paymentId: paymentId,
+    });
+  }
+}
+
+function notifyEmployeePaid_(emp, period, total, paymentId) {
+  if (!emp || !emp.line_user_id) {
+    logWarn('notifyEmployeePaid', 'employee has no line_user_id', {
+      employeeId: emp && emp.employee_id,
+      paymentId: paymentId,
+    });
+    return;
+  }
+
+  try {
+    pushText(emp.line_user_id,
+      'บริษัท วอร์ด้า สกินแคร์ จำกัด\n\n' +
+      'โอนค่าจ้างเรียบร้อยแล้ว\n' +
+      'รอบ: ' + period + '\n' +
+      'รหัสรายการ: ' + paymentId + '\n' +
+      'ยอดโอน: ' + formatBaht_(total) + '\n' +
+      'สถานะ: จ่ายแล้ว\n\n' +
+      'สามารถกดเมนู "ดูยอด" เพื่อตรวจสอบสถานะล่าสุดได้');
+  } catch (err) {
+    logWarn('notifyEmployeePaid', 'push failed: ' + err.message, {
+      employeeId: emp.employee_id,
+      paymentId: paymentId,
+    });
+  }
+}
+
+function formatBaht_(amount) {
+  return Number(amount || 0).toLocaleString('th-TH') + ' บาท';
 }

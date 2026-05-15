@@ -145,6 +145,11 @@ function markPaid(payload) {
   const rowVals = sh.getRange(rowIdx, 1, 1, sh.getLastColumn()).getValues()[0];
   const emp = findEmployeeById_(rowVals[iEmp]);
   const empName = emp ? emp.display_name : rowVals[iEmp];
+  const oldStatus = rowVals[iStatus - 1];
+
+  if (oldStatus === 'จ่ายแล้ว') {
+    return { ok: true, alreadyPaid: true };
+  }
 
   sh.getRange(rowIdx, iStatus).setValue('จ่ายแล้ว');
   sh.getRange(rowIdx, iPaid).setValue(nowBangkok());
@@ -155,6 +160,8 @@ function markPaid(payload) {
     period: rowVals[iPeriod],
     total: Number(rowVals[iAmount] || 0),
   });
+
+  notifyEmployeePaid_(emp, rowVals[iPeriod], Number(rowVals[iAmount] || 0), payload.paymentId);
 
   return { ok: true };
 }
