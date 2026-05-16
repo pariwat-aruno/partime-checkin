@@ -56,8 +56,8 @@ function buildApprovalCard(args) {
   ];
 
   const distanceText = hasOutOfRange
-    ? args.lastDistanceM + ' m (นอกรัศมี ' + args.radiusM + ' m)'
-    : args.lastDistanceM + ' m';
+    ? formatKmM_(args.lastDistanceM) + ' / รัศมี ' + formatKmM_(args.radiusM)
+    : formatKmM_(args.lastDistanceM);
   const distanceColor = hasOutOfRange ? CHERRY_DARK : TEXT;
 
   const bodyContents = slotImages.concat([
@@ -83,7 +83,7 @@ function buildApprovalCard(args) {
       type: 'box', layout: 'vertical', margin: 'sm',
       paddingAll: '10px', backgroundColor: '#fef2f2', cornerRadius: '6px',
       contents: [{
-        type: 'text', text: 'มีบาง slot อยู่นอกพื้นที่หน้างาน',
+        type: 'text', text: 'เช็คอินนอกเขต',
         size: 'xs', color: CHERRY_DARK, wrap: true,
       }],
     });
@@ -122,6 +122,9 @@ function buildApprovalCard(args) {
             ],
           },
           actionButton_('ไม่อนุมัติ', 'action=reject&id=' + args.checkinId, REJECT),
+          ...(hasOutOfRange ? [
+            actionButton_('รับทราบ', 'action=ack_out_of_range&id=' + args.checkinId, '#6b7280'),
+          ] : []),
         ],
       },
     },
@@ -134,8 +137,8 @@ function buildScanProgressCard(args) {
   const tag = args.outOfRange ? 'นอกรัศมี ' : '';
   const headerLabel = tag + 'สแกน ' + args.slotLabel + ' (' + args.scanCount + '/4)';
   const distanceText = args.outOfRange
-    ? args.distanceM + ' m (นอกรัศมี ' + args.radiusM + ' m)'
-    : args.distanceM + ' m';
+    ? formatKmM_(args.distanceM) + ' / รัศมี ' + formatKmM_(args.radiusM)
+    : formatKmM_(args.distanceM);
   const distanceColor = args.outOfRange ? CHERRY_DARK : TEXT;
 
   return {
@@ -170,8 +173,25 @@ function buildScanProgressCard(args) {
           infoRow_('พนักงาน', args.employeeId + ' — ' + args.displayName),
           infoRowColored_('ระยะ', distanceText, distanceColor),
           infoRow_('สแกนแล้ว', args.scanCount + '/4'),
+          ...(args.outOfRange ? [{
+            type: 'box', layout: 'vertical', margin: 'sm',
+            paddingAll: '10px', backgroundColor: '#fef2f2', cornerRadius: '6px',
+            contents: [{
+              type: 'text', text: 'เช็คอินนอกเขต', size: 'sm',
+              color: CHERRY_DARK, weight: 'bold', wrap: true, align: 'center',
+            }],
+          }] : []),
         ],
       },
+      ...(args.outOfRange ? {
+        footer: {
+          type: 'box', layout: 'vertical',
+          contents: [{
+            type: 'button', style: 'primary', color: '#6b7280', height: 'md',
+            action: { type: 'postback', label: 'รับทราบ', data: 'action=ack_out_of_range&id=' + args.checkinId, displayText: 'รับทราบ' },
+          }],
+        },
+      } : {}),
     },
   };
 }
@@ -423,6 +443,12 @@ function actionButton_(label, postbackData, color) {
     type: 'button', style: 'primary', color: color, height: 'sm',
     action: { type: 'postback', label: label, data: postbackData, displayText: label },
   };
+}
+
+function formatKmM_(meters) {
+  const m = Math.max(0, Math.round(Number(meters) || 0));
+  const km = (m / 1000).toFixed(2);
+  return km + ' km (' + m.toLocaleString() + ' m)';
 }
 
 function driveUrlToThumbnail_(url) {

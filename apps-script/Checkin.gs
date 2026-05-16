@@ -156,6 +156,7 @@ function checkin(payload) {
         const card = buildScanProgressCard({
           displayName: emp.display_name,
           employeeId: emp.employee_id,
+          checkinId: sh.getRange(rowNum, colIdx['checkin_id']).getValue(),
           slot: slot,
           slotLabel: slotLabel,
           scanCount: newScanCount,

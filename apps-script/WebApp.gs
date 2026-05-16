@@ -371,6 +371,14 @@ function handlePostback_(ev) {
     return replyText(ev.replyToken, formatApprovalReply_(result));
   }
 
+  if (data.action === 'ack_out_of_range') {
+    const result = acknowledgeOutOfRange_(data.id, userId);
+    if (!result.ok) {
+      return replyText(ev.replyToken, '❌ ' + result.error);
+    }
+    return replyText(ev.replyToken, result.message);
+  }
+
   return replyText(ev.replyToken, 'unknown action: ' + data.action);
 }
 
@@ -469,6 +477,51 @@ function formatApprovalReply_(r) {
   }
   const t = r.dayType === 'full' ? 'เต็มวัน' : 'ครึ่งวัน';
   return 'อนุมัติเรียบร้อย\n' + r.employeeName + ' — ' + r.date + '\n' + t + ' ' + r.wage + ' บาท';
+}
+
+function acknowledgeOutOfRange_(checkinId, ownerUserId) {
+  const sheetId = PropertiesService.getScriptProperties().getProperty('SHEET_ID');
+  const sh = SpreadsheetApp.openById(sheetId).getSheetByName('Checkins');
+  const last = sh.getLastRow();
+  if (last < 2) return { ok: false, error: 'no_checkins' };
+
+  const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+  const ids = sh.getRange(2, 1, last - 1, 1).getValues();
+  let rowIdx = -1;
+  for (let i = 0; i < ids.length; i++) {
+    if (ids[i][0] === checkinId) { rowIdx = i + 2; break; }
+  }
+  if (rowIdx < 0) return { ok: false, error: 'checkin_not_found: ' + checkinId };
+
+  const rowData = sh.getRange(rowIdx, 1, 1, sh.getLastColumn()).getValues()[0];
+  const iEmp = headers.indexOf('employee_id');
+  const iDate = headers.indexOf('checkin_date');
+  const iDistance = headers.indexOf('last_distance_m');
+  const iOor = headers.indexOf('has_out_of_range');
+  const empId = rowData[iEmp];
+  const emp = findEmployeeById_(empId);
+  const empName = emp ? emp.display_name : empId;
+  const date = rowData[iDate];
+  const dateStr = (date instanceof Date)
+    ? Utilities.formatDate(date, 'Asia/Bangkok', 'd MMM yyyy')
+    : String(date);
+  const distanceM = Number(rowData[iDistance] || 0);
+  const radiusM = Number(getConfig().geofence_radius_m || 0);
+  const hasOutOfRange = rowData[iOor] === true;
+  const message = hasOutOfRange
+    ? 'รับทราบเช็คอินนอกเขตแล้ว\n' + empName + ' — ' + dateStr + '\n' +
+      formatKmM_(distanceM) + ' / รัศมี ' + formatKmM_(radiusM)
+    : 'รับทราบรายการนี้แล้ว\n' + empName + ' — ' + dateStr;
+
+  logOwnerAction(ownerUserId, 'ack_out_of_range', checkinId, empName, {
+    date: dateStr,
+    distance_m: distanceM,
+    radius_m: radiusM,
+    has_out_of_range: hasOutOfRange,
+  });
+  logInfo('postback', 'ack_out_of_range', { checkinId: checkinId, employeeId: empId, hasOutOfRange: hasOutOfRange });
+
+  return { ok: true, message: message };
 }
 
 function jsonOut_(obj) {

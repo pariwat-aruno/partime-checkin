@@ -163,7 +163,7 @@
 | `timestamp` | datetime | |
 | `owner_user_id` | string | LINE User ID เจ้าของที่ทำรายการ |
 | `owner_name` | string | ชื่อจาก LINE profile ถ้าดึงได้ |
-| `action` | enum | `approve_full` / `approve_half` / `reject` / `close_period` / `mark_paid` / `restore_pending` |
+| `action` | enum | `approve_full` / `approve_half` / `reject` / `close_period` / `mark_paid` / `restore_pending` / `ack_out_of_range` |
 | `target_id` | string | `checkin_id` หรือ `payment_id` |
 | `target_name` | string | ชื่อพาร์ทไทม์ |
 | `detail` | string | JSON string รายละเอียด |

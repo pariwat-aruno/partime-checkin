@@ -499,7 +499,7 @@
 
       const checkins = (r.checkins || []).map(function (c) {
         const flags = [];
-        if (c.has_out_of_range) flags.push('นอกรัศมี');
+        if (c.has_out_of_range) flags.push('<span style="color: var(--reject); font-weight: 700;">เช็คอินนอกเขต</span>');
         if (c.scan_count < 4) flags.push('สแกน ' + c.scan_count + '/4');
         return '<div class="history-row">' +
           '<div class="top"><span>' + escape_(c.date) + '</span><span>' + escape_(c.status || '-') + '</span></div>' +
