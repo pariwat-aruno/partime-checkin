@@ -280,6 +280,7 @@
 - **Acceptance:**
   - [ ] 3 หน้า HTML deploy ที่ public URL
   - [ ] LIFF endpoint URL ใน LINE Developers อัปเดตให้ตรง URL จริง
+  - [ ] `API_URL` ใน frontend ชี้ไป Web App deployment ล่าสุด
 - **Depends on:** TASK-21, TASK-22, TASK-23
 
 ---
@@ -290,10 +291,12 @@
 - **ทำ:** Deploy → New deployment → Web app
 - **Acceptance:**
   - [ ] Execute as: Me
-  - [ ] Who has access: Anyone
+  - [ ] Who has access: Anyone / anonymous
   - [ ] copy Web App URL
   - [ ] paste URL ใน LINE Developers → Webhook URL
   - [ ] กดปุ่ม "Verify" ใน LINE — ต้องได้ success
+  - [ ] หน้า Owner เปิดได้โดยไม่ขึ้น `Load failed`
+  - [ ] ปุ่ม `ประวัติ` เรียก action ล่าสุดได้ ไม่เจอ `unknown_action`
 - **Depends on:** TASK-14 ถึง TASK-20
 
 ### TASK-26: Test Flow A (ลงทะเบียน)
@@ -339,5 +342,6 @@
 - [ ] Test ทั้ง 4 flow ผ่าน + edge cases ผ่าน
 - [ ] CONTEXT.md ตรงกับ implementation จริง (ถ้ามีเปลี่ยน → อัปเดตก่อน)
 - [ ] architecture.md อัปเดตตามที่เปลี่ยนแปลงระหว่าง build
+- [ ] frontend `API_URL` และ Apps Script Web App deployment ตรงกัน
 - [ ] commit + push GitHub แล้ว
 - [ ] ส่ง URL rich menu ให้พาร์ทไทม์เพิ่มเป็น friend ได้

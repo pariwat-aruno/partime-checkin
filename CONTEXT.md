@@ -56,6 +56,7 @@
 - พาร์ทไทม์ระบุตัวตนด้วย LINE User ID (ดึงอัตโนมัติจาก LIFF) ไม่มี password
 - เจ้าของอ่านจาก `owner_line_user_ids` ใน Sheet `Config` แบบ comma-separated หรือ fallback เป็น Script Properties `OWNER_LINE_USER_ID`
 - LIFF API ต้องส่ง `idToken` และ Apps Script verify กับ LINE ก่อนใช้ `line_user_id` จริงจาก token
+- ฝั่ง LIFF ต้องเรียก `API_URL` ให้ตรงกับ Apps Script Web App deployment ล่าสุด ไม่งั้นหน้า Owner จะขึ้น `Load failed`
 
 ---
 
@@ -175,7 +176,7 @@
 2. **Error handling:** ทุก function ของ Apps Script ต้อง try-catch + log ลง Sheet `Logs`
 3. **Idempotent:** เช็คอินซ้ำ slot เดิมในวันเดียวกัน = ไม่ overwrite, ปิดยอดซ้ำรอบเดิม = block
 4. **Timeout:** Apps Script function ต้องจบภายใน 6 นาที
-5. **Secrets:** ใส่ใน Script Properties (`LINE_CHANNEL_ACCESS_TOKEN`, `OWNER_LINE_USER_ID`, `SHEET_ID`, `LIFF_ID`) ห้ามใส่ใน code
+5. **Secrets:** ใส่ใน Script Properties (`LINE_CHANNEL_ACCESS_TOKEN`, `OWNER_LINE_USER_ID`, `SHEET_ID`, `LIFF_ID`) ห้ามใส่ใน code; ฝั่ง LIFF เก็บ `API_URL` ใน config และต้องตรงกับ Web App deployment ล่าสุด
 6. **Time zone:** ทุก datetime เก็บเป็น `Asia/Bangkok` (ISO 8601 พร้อม offset `+07:00`)
 7. **ID format:**
    - Employees: `EMP-XXXX` (4 หลัก running)

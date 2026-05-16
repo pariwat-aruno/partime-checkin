@@ -63,9 +63,25 @@
     const loadingEl = document.getElementById('loading');
     const contentEl = document.getElementById('content');
 
+    async function redirectOwnerIfNeeded() {
+      if (CONFIG.DEV_MOCK_LIFF) return false;
+      try {
+        await api.post('getOwnerDashboard', {
+          lineUserId: state.lineUserId,
+          period: new Date().getFullYear() + '-' + String(new Date().getMonth() + 1).padStart(2, '0'),
+        });
+        window.location.replace('./admin.html');
+        return true;
+      } catch (e) {
+        if (e.code === 'not_owner') return false;
+        throw e;
+      }
+    }
+
     async function boot() {
       try {
         await initAuth(CONFIG.LIFF_ID_BALANCE);
+        if (await redirectOwnerIfNeeded()) return;
         const result = await api.post('getBalance', { lineUserId: state.lineUserId });
 
         document.getElementById('month-total').textContent = result.currentMonth.total.toLocaleString();

@@ -59,3 +59,16 @@
 คอลัมน์ payment ปัจจุบันรองรับ:
 
 `base_amount`, `extra_amount`, `ot_amount`, `total_amount`, `adjustment_note`
+
+## Deploy note
+
+- ฝั่ง LIFF ใช้ `API_URL` จาก `liff/js/config.js`
+- ฝั่ง Apps Script ต้อง deploy เป็น Web App แบบ public anonymous ไม่งั้นหน้า Owner จะขึ้น `Load failed`
+- ถ้าเปลี่ยน deployment ของ Apps Script แล้ว ให้เปลี่ยน `API_URL` ให้ตรง deployment ล่าสุดทุกครั้ง
+- ถ้าเปิดหน้า Owner แล้วกด `ประวัติ` ได้ `unknown_action` มักแปลว่า frontend หรือ Web App ยังเป็นเวอร์ชันเก่า ให้รีโหลดหน้า LIFF แล้วตรวจ deployment อีกครั้ง
+
+## Troubleshooting สั้น ๆ
+
+- `Load failed` = ตรวจ `API_URL` และสิทธิ์ Web App ก่อน
+- `unknown_action` = ตรวจว่า frontend เรียก backend รุ่นล่าสุด
+- หน้า Owner ว่างเปล่า = ตรวจว่า LIFF init ผ่าน และ `idToken` ถูกส่งไปกับ request

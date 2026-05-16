@@ -141,6 +141,8 @@ graph TD
 | Apps Script timeout 6 นาที | upload รูปทีละไฟล์ + jobs ที่หนักส่งต่อ n8n queue | Apps Script try-catch + log |
 | LINE push fail | log ลง Sheet `Logs` + retry 3 ครั้ง exponential backoff | Apps Script `pushLine()` helper |
 | รูปใหญ่เกินขีด LIFF | resize ใน frontend ก่อน base64 encode | LIFF frontend |
+| หน้า Owner ขึ้น `Load failed` | ตรวจ `API_URL` และว่า Apps Script Web App deploy เป็น public anonymous | LIFF frontend + Apps Script deployment |
+| กด `ประวัติ` แล้วได้ `unknown_action` | frontend หรือ Web App ยังเป็นเวอร์ชันเก่า ต้อง deploy / refresh ใหม่ | LIFF frontend + Apps Script deployment |
 
 ---
 
