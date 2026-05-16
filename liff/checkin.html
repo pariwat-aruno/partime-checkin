@@ -278,13 +278,9 @@
         if (result.alreadyScanned) {
           msg = 'slot นี้สแกนไปแล้ว';
         } else if (result.completed) {
-          msg = 'สแกนครบ 4/4 — ส่งคำขออนุมัติให้เจ้าของแล้ว';
+          msg = 'เช็คอิน ' + result.slotLabel + ' สำเร็จแล้ว\nปิดหน้าจอได้';
         } else {
-          msg = 'บันทึก slot ' + result.slot + ' (' + result.slotLabel + ') แล้ว — ' +
-                'สแกน ' + result.scanCount + '/4';
-        }
-        if (result.outOfRange) {
-          msg += '\nนอกรัศมี ' + result.distanceM + ' m — flag ส่งให้เจ้าของพิจารณา';
+          msg = 'เช็คอิน ' + result.slotLabel + ' สำเร็จแล้ว\nปิดหน้าจอได้';
         }
         okEl.style.whiteSpace = 'pre-line';
         okEl.textContent = msg;
