@@ -179,7 +179,7 @@
   - [ ] เช็ค duplicate (employee_id + checkin_date วันนี้) → ถ้ามีแล้ว return แถวเดิม `{ok:true, duplicated:true}`
   - [ ] upload selfie → Drive
   - [ ] insert row status=`pending`, day_type=`null`, wage=`0`
-  - [ ] push flex card หา `OWNER_LINE_USER_ID` (TASK-18)
+  - [ ] push flex card หา `OWNER_LINE_USER_ID` (TASK-18) พร้อมปุ่ม `รับทราบ` ถ้า `out_of_range`
   - [ ] return `{ok:true, checkinId}`
 - **Depends on:** TASK-14, TASK-18
 
@@ -236,6 +236,7 @@
   - [ ] `markPaid` ไม่ส่งซ้ำถ้า status เป็น `จ่ายแล้ว` อยู่แล้ว
   - [ ] `restorePaymentPending({paymentId, reason})` เปลี่ยน status กลับเป็น `รอจ่าย`, clear `paid_at`, log เหตุผลใน `OwnerLogs`
   - [ ] `getEmployeeHistory({employeeId, period})` return checkins + payments ของพาร์ทไทม์รายคน
+  - [ ] `ack_out_of_range({checkinId})` log owner ว่ารับทราบรายการนอกเขต
   - [ ] ทุก action verify owner จาก LIFF idToken
 - **Depends on:** TASK-20
 
@@ -333,6 +334,7 @@
   - [ ] owner กดจ่ายแล้ว → status=`จ่ายแล้ว`, พาร์ทไทม์ได้รับ LINE แจ้ง
   - [ ] owner กดแก้เป็นรอจ่าย → status=`รอจ่าย`, clear paid_at, มี OwnerLogs
   - [ ] หน้า Owner ปุ่มประวัติแสดง checkins + payments รายคน
+  - [ ] เช็คอินนอกเขตที่ owner กดรับทราบแล้ว แสดง `รับทราบแล้ว` ในประวัติ
 
 ---
 

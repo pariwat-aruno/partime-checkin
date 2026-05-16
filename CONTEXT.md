@@ -167,6 +167,7 @@
 | `target_id` | string | `checkin_id` หรือ `payment_id` |
 | `target_name` | string | ชื่อพาร์ทไทม์ |
 | `detail` | string | JSON string รายละเอียด |
+| `ack_out_of_range` | — | owner กด `รับทราบ` เช็คอินนอกเขต แล้วให้ history แสดง `รับทราบแล้ว` |
 
 ---
 

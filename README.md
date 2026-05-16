@@ -66,6 +66,8 @@
 - ฝั่ง Apps Script ต้อง deploy เป็น Web App แบบ public anonymous ไม่งั้นหน้า Owner จะขึ้น `Load failed`
 - ถ้าเปลี่ยน deployment ของ Apps Script แล้ว ให้เปลี่ยน `API_URL` ให้ตรง deployment ล่าสุดทุกครั้ง
 - ถ้าเปิดหน้า Owner แล้วกด `ประวัติ` ได้ `unknown_action` มักแปลว่า frontend หรือ Web App ยังเป็นเวอร์ชันเก่า ให้รีโหลดหน้า LIFF แล้วตรวจ deployment อีกครั้ง
+- หน้าเช็คอินตอนนี้ใช้ปุ่ม `เปิดกล้อง` ก่อนเริ่ม permission camera
+- ถ้า owner กด `รับทราบ` รายการนอกเขต ระบบจะเก็บสถานะไว้ใน `OwnerLogs` และแสดง `รับทราบแล้ว` ในประวัติ
 
 ## Troubleshooting สั้น ๆ
 
