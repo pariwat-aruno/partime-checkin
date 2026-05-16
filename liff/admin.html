@@ -110,6 +110,7 @@
     }
     .history-row .top { display:flex; justify-content:space-between; gap:8px; font-weight:600; margin-bottom:6px; }
     .history-row .meta { color: var(--muted); font-size: 12px; line-height: 1.5; }
+    .history-flag.danger { color: var(--reject); font-weight: 700; }
 
     /* Activity log */
     #log-section { margin-top: 18px; }
@@ -499,8 +500,13 @@
 
       const checkins = (r.checkins || []).map(function (c) {
         const flags = [];
-        if (c.has_out_of_range) flags.push('<span style="color: var(--reject); font-weight: 700;">เช็คอินนอกเขต</span>');
-        if (c.scan_count < 4) flags.push('สแกน ' + c.scan_count + '/4');
+        if (c.has_out_of_range) {
+          const label = c.out_of_range_acknowledged
+            ? 'เช็คอินนอกเขต (รับทราบแล้ว)'
+            : 'เช็คอินนอกเขต';
+          flags.push('<span class="history-flag danger">' + escape_(label) + '</span>');
+        }
+        if (c.scan_count < 4) flags.push('<span class="history-flag">' + escape_('สแกน ' + c.scan_count + '/4') + '</span>');
         return '<div class="history-row">' +
           '<div class="top"><span>' + escape_(c.date) + '</span><span>' + escape_(c.status || '-') + '</span></div>' +
           '<div class="meta">' + escape_(c.day_type || '-') + ' • ' + Number(c.wage || 0).toLocaleString() + ' บาท' +

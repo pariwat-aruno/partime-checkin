@@ -383,6 +383,7 @@ function listEmployeeCheckinsForPeriod_(ss, employeeId, period) {
   const slotIdx = [1, 2, 3, 4].map(function (s) {
     return { at: headers.indexOf('slot' + s + '_at'), url: headers.indexOf('slot' + s + '_url') };
   });
+  const ackMap = buildOwnerAckMapForPeriod_(ss, employeeId, period);
 
   const items = [];
   data.forEach(function (row) {
@@ -398,6 +399,7 @@ function listEmployeeCheckinsForPeriod_(ss, employeeId, period) {
       scan_count: Number(row[iScan] || 0),
       last_distance_m: Number(row[iDist] || 0),
       has_out_of_range: row[iOOR] === true,
+      out_of_range_acknowledged: !!ackMap[row[iId]],
       slots: slotIdx.map(function (sc, i) {
         const at = row[sc.at];
         const url = row[sc.url];
@@ -412,6 +414,41 @@ function listEmployeeCheckinsForPeriod_(ss, employeeId, period) {
   });
   items.sort(function (a, b) { return String(a.date).localeCompare(String(b.date)); });
   return items;
+}
+
+function buildOwnerAckMapForPeriod_(ss, employeeId, period) {
+  const out = {};
+  const checkSh = ss.getSheetByName('Checkins');
+  const last = checkSh.getLastRow();
+  if (last < 2) return out;
+  const ch = checkSh.getRange(1, 1, 1, checkSh.getLastColumn()).getValues()[0];
+  const cd = checkSh.getRange(2, 1, last - 1, checkSh.getLastColumn()).getValues();
+  const iId = ch.indexOf('checkin_id');
+  const iEmp = ch.indexOf('employee_id');
+  const iDate = ch.indexOf('checkin_date');
+
+  const targetCheckins = {};
+  cd.forEach(function (row) {
+    if (row[iEmp] !== employeeId) return;
+    const date = formatSheetDate_(row[iDate], 'yyyy-MM-dd');
+    if (date.substring(0, 7) !== period) return;
+    targetCheckins[row[iId]] = true;
+  });
+
+  const logSh = ss.getSheetByName('OwnerLogs');
+  if (!logSh) return out;
+  const lastLog = logSh.getLastRow();
+  if (lastLog < 2) return out;
+  const lh = logSh.getRange(1, 1, 1, logSh.getLastColumn()).getValues()[0];
+  const ld = logSh.getRange(2, 1, lastLog - 1, logSh.getLastColumn()).getValues();
+  const iAction = lh.indexOf('action');
+  const iTarget = lh.indexOf('target_id');
+  ld.forEach(function (row) {
+    if (row[iAction] !== 'ack_out_of_range') return;
+    if (!targetCheckins[row[iTarget]]) return;
+    out[row[iTarget]] = true;
+  });
+  return out;
 }
 
 function listEmployeePaymentsForPeriod_(ss, employeeId, period) {
