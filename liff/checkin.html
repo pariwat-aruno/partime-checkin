@@ -83,6 +83,7 @@
         <img      id="captured" alt="captured" />
       </div>
 
+      <button id="btn-open-camera" class="btn-secondary">เปิดกล้อง</button>
       <button id="btn-capture" class="btn-primary" disabled>ถ่ายภาพ</button>
       <button id="btn-retake"  class="btn-secondary" style="display:none">ถ่ายใหม่</button>
       <button id="btn-submit"  class="btn-primary"   style="display:none;margin-top:10px">ส่งเช็คอิน</button>
@@ -115,6 +116,7 @@
     const videoEl = document.getElementById('video');
     const capturedEl = document.getElementById('captured');
     const camStatusEl = document.getElementById('cam-status');
+    const btnOpenCamera = document.getElementById('btn-open-camera');
     const btnCapture = document.getElementById('btn-capture');
     const btnRetake  = document.getElementById('btn-retake');
     const btnSubmit  = document.getElementById('btn-submit');
@@ -123,6 +125,7 @@
     let coords = null;
     let capturedBase64 = null;
     let todayStatus = null;
+    let cameraReady = false;
 
     async function redirectOwnerIfNeeded() {
       if (CONFIG.DEV_MOCK_LIFF) return false;
@@ -174,7 +177,6 @@
       contentEl.style.display = 'block';
 
       fetchGps();
-      openCamera();
     }
 
     function renderSlotGrid(status) {
@@ -214,12 +216,21 @@
 
     async function openCamera() {
       try {
+        btnOpenCamera.disabled = true;
+        camStatusEl.textContent = 'กำลังขอ permission กล้อง...';
         camStream = await startCamera(videoEl, 'user');
+        cameraReady = true;
         camStatusEl.style.display = 'none';
         updateBtn();
       } catch (e) {
+        cameraReady = false;
+        btnOpenCamera.disabled = false;
         camStatusEl.textContent = 'กล้องไม่พร้อม: ' + (e.message || '');
-        showError(errEl, 'กล้องไม่พร้อม — อนุญาต permission กล้องใน LINE');
+        if (String(e && e.name || '').indexOf('NotAllowed') >= 0) {
+          showError(errEl, 'LINE ยังไม่ได้อนุญาตกล้อง ให้กด "เปิดกล้อง" แล้วอนุญาต permission');
+        } else {
+          showError(errEl, 'กล้องไม่พร้อม — อนุญาต permission กล้องใน LINE');
+        }
       }
     }
 
@@ -289,10 +300,12 @@
     });
 
     function updateBtn() {
-      const ready = coords && camStream;
+      const ready = coords && cameraReady;
       const slotDone = todayStatus && todayStatus.slots.find(function(s){ return s.slot === todayStatus.currentSlot && s.completed; });
       btnCapture.disabled = !ready || !!slotDone;
     }
+
+    btnOpenCamera.addEventListener('click', openCamera);
 
     window.addEventListener('pagehide', () => stopCamera(camStream));
     boot();
