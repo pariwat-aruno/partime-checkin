@@ -63,14 +63,15 @@ graph TD
 | # | Step | ใครทำ | ข้อมูลที่ส่ง | ปลายทาง |
 |---|------|-------|-----------|--------|
 | 1 | กด rich menu "เช็คอิน" | พาร์ทไทม์ | — | เปิด LIFF |
-| 2 | LIFF ขอ GPS + เปิดกล้องถ่าย selfie | LIFF | auto-detect slot 1-4 | — |
-| 3 | submit | LIFF | lat, lng, selfie, slot + idToken | Apps Script |
-| 4 | คำนวณ haversine vs `geofence_lat/lng` | Apps Script | — | — |
-| 5 | ถ้าเกิน radius → บันทึกได้แต่ flag `has_out_of_range` | Apps Script | warning flag | Sheet |
-| 6 | เช็ค duplicate slot เดิมในวันเดียวกัน | Apps Script | — | Sheet `Checkins` |
-| 7 | upload selfie | Apps Script | รูป | Google Drive |
-| 8 | update slot N + scan_count, status=`pending` | Apps Script | row | Sheet `Checkins` |
-| 9 | push progress card หาเจ้าของทุก slot และ approval card เมื่อครบ 4 slot | Apps Script | flex JSON | LINE → เจ้าของ |
+| 2 | LIFF default-select slot ตามเวลา (1-4) — พาร์ทไทม์เลือก slot อื่นได้ถ้าจะย้อน | LIFF | — | — |
+| 3 | LIFF ขอ GPS + เปิดกล้องถ่าย selfie | LIFF | — | — |
+| 4 | submit | LIFF | lat, lng, selfie, slot (จาก user เลือก) + idToken | Apps Script |
+| 5 | คำนวณ haversine vs `geofence_lat/lng` | Apps Script | — | — |
+| 6 | ถ้าเกิน radius → บันทึกได้แต่ flag `has_out_of_range` | Apps Script | warning flag | Sheet |
+| 7 | เช็ค duplicate slot เดิมในวันเดียวกัน | Apps Script | — | Sheet `Checkins` |
+| 8 | upload selfie | Apps Script | รูป | Google Drive |
+| 9 | update slot N + scan_count, status=`pending` | Apps Script | row | Sheet `Checkins` |
+| 10 | push progress card หาเจ้าของทุก slot และ approval card เมื่อครบ 4 slot | Apps Script | flex JSON | LINE → เจ้าของ |
 
 ### Flow C: เจ้าของอนุมัติ
 
@@ -132,6 +133,8 @@ graph TD
 | GPS อยู่นอกรัศมี | reject + แจ้ง distance ที่อยู่ | Apps Script `checkin()` |
 | ผู้ใช้ปิด GPS | LIFF แจ้ง "ต้องเปิด location" + ไม่ส่ง request | LIFF frontend |
 | เช็คอินซ้ำวันเดียวกัน | ไม่สร้างแถวใหม่ + return แถวเดิม | Apps Script `checkin()` (เช็ค employee_id + checkin_date) |
+| สแกนช้า / ต้องการย้อน slot ที่ผ่านมา | LIFF ให้กดเลือก slot เองบน grid (default = slot ตามเวลา) | LIFF checkin frontend |
+| สแกน slot เดิมซ้ำในวัน | return `alreadyScanned` ไม่ overwrite | Apps Script `checkin()` |
 | เจ้าของไม่กดอนุมัติ | row ค้าง `pending` ตลอด, นับยอดเฉพาะ approved | Apps Script `getBalance()` |
 | ลาออกแล้ว LINE userId เดิมเช็คอินอีก | block ที่ `is_active=FALSE` | Apps Script `checkin()` |
 | ปิดยอดแต่มี pending ค้าง | LIFF Owner เตือน "ยังมี X วัน pending" และต้องกดปิดแบบ confirm | Apps Script `closePeriod()` |
