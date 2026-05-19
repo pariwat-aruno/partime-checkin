@@ -14,17 +14,25 @@
       background: var(--bg); border: 1px solid var(--border);
       border-radius: 8px; padding: 10px 4px;
       text-align: center; font-size: 11px;
+      cursor: pointer; user-select: none;
+      transition: transform 0.05s ease;
     }
+    .slot-status:active { transform: scale(0.96); }
     .slot-status.done {
       background: var(--cherry-tint); border-color: var(--cherry);
       color: var(--cherry-dark);
+      cursor: not-allowed;
     }
-    .slot-status.current {
+    .slot-status.selected {
       background: var(--cherry); color: #fff;
       border-color: var(--cherry-dark);
     }
     .slot-status .marker { font-size: 14px; display: block; margin-bottom: 2px; font-weight: 700; }
     .slot-status .label  { font-weight: 600; }
+    .slot-status .now-tag {
+      font-size: 9px; display: block; margin-top: 2px;
+      opacity: 0.75; font-weight: 500;
+    }
 
     .current-slot-banner {
       background: var(--cherry); color: var(--white);
@@ -126,6 +134,7 @@
     let capturedBase64 = null;
     let todayStatus = null;
     let cameraReady = false;
+    let selectedSlot = null;  // slot ที่ user เลือกจะสแกน (default = currentSlot)
 
     async function redirectOwnerIfNeeded() {
       if (CONFIG.DEV_MOCK_LIFF) return false;
@@ -181,25 +190,63 @@
 
     function renderSlotGrid(status) {
       const cur = status.currentSlot;
+
+      // กำหนด default selectedSlot ครั้งแรก = currentSlot ถ้ายังไม่ได้เลือก
+      // ถ้า currentSlot สแกนไปแล้ว → หา slot แรกที่ยังว่าง
+      if (selectedSlot == null) {
+        const curObj = status.slots.find(function(s){ return s.slot === cur; });
+        if (curObj && !curObj.completed) {
+          selectedSlot = cur;
+        } else {
+          const firstOpen = status.slots.find(function(s){ return !s.completed; });
+          selectedSlot = firstOpen ? firstOpen.slot : cur;
+        }
+      }
+
       gridEl.innerHTML = status.slots.map(function (s) {
-        const cls = s.completed ? 'done' : (s.slot === cur ? 'current' : '');
-        const marker = s.completed ? 'OK' : (s.slot === cur ? 'NOW' : '—');
-        return '<div class="slot-status ' + cls + '">' +
+        const isDone = s.completed;
+        const isSelected = s.slot === selectedSlot;
+        const isNow = s.slot === cur;
+        const cls = isDone ? 'done' : (isSelected ? 'selected' : '');
+        const marker = isDone ? 'OK' : (isSelected ? 'NOW' : '—');
+        const nowTag = (!isDone && isNow && !isSelected) ? '<span class="now-tag">ตามเวลา</span>' : '';
+        return '<div class="slot-status ' + cls + '" data-slot="' + s.slot + '">' +
                   '<span class="marker">' + marker + '</span>' +
                   '<span class="label">' + s.label + '</span>' +
+                  nowTag +
                 '</div>';
       }).join('');
 
-      const curSlot = status.slots.find(function(s){ return s.slot === cur; });
-      if (curSlot && curSlot.completed) {
+      const selObj = status.slots.find(function(s){ return s.slot === selectedSlot; });
+      const selLabel = selObj ? selObj.label : '';
+      const allDone = status.slots.every(function(s){ return s.completed; });
+
+      if (allDone) {
         bannerEl.style.background = 'var(--muted)';
-        bannerEl.textContent = '"' + status.currentSlotLabel + '" สแกนไปแล้ว — รอ slot ถัดไป';
-        btnCapture.disabled = true;
-        btnCapture.textContent = 'สแกนซ้ำไม่ได้';
+        bannerEl.textContent = 'สแกนครบทั้ง 4 slot แล้ว — รอเจ้าของอนุมัติ';
+      } else if (selObj && selObj.completed) {
+        bannerEl.style.background = 'var(--muted)';
+        bannerEl.textContent = '"' + selLabel + '" สแกนไปแล้ว — เลือก slot อื่น';
       } else {
-        bannerEl.textContent = 'กำลังสแกน slot ที่ ' + cur + ': ' + status.currentSlotLabel;
+        bannerEl.style.background = '';
+        const hint = (selectedSlot !== cur) ? ' (ย้อน slot — slot ตามเวลาคือ ' + cur + ')' : '';
+        bannerEl.textContent = 'กำลังสแกน slot ที่ ' + selectedSlot + ': ' + selLabel + hint;
       }
     }
+
+    // click delegation — เลือก slot
+    gridEl.addEventListener('click', function (ev) {
+      const cell = ev.target.closest('.slot-status');
+      if (!cell || !todayStatus) return;
+      const slotNum = Number(cell.getAttribute('data-slot'));
+      const slotObj = todayStatus.slots.find(function(s){ return s.slot === slotNum; });
+      if (!slotObj) return;
+      if (slotObj.completed) return;  // กดสแกนซ้ำไม่ได้
+      if (slotNum === selectedSlot) return;
+      selectedSlot = slotNum;
+      renderSlotGrid(todayStatus);
+      updateBtn();
+    });
 
     async function fetchGps() {
       try {
@@ -236,7 +283,8 @@
 
     btnCapture.addEventListener('click', () => {
       try {
-        const slotLabel = todayStatus.currentSlotLabel || ('slot ' + todayStatus.currentSlot);
+        const selObj = todayStatus.slots.find(function(s){ return s.slot === selectedSlot; });
+        const slotLabel = (selObj && selObj.label) || ('slot ' + selectedSlot);
         capturedBase64 = captureFromVideoWithStamp(videoEl, slotLabel);
         capturedEl.src = capturedBase64;
         videoEl.style.display = 'none';
@@ -269,7 +317,7 @@
           lat:          coords.lat,
           lng:          coords.lng,
           selfieBase64: capturedBase64,
-          slot:         todayStatus.currentSlot,
+          slot:         selectedSlot,
         });
         stopCamera(camStream); camStream = null;
 
@@ -297,8 +345,9 @@
 
     function updateBtn() {
       const ready = coords && cameraReady;
-      const slotDone = todayStatus && todayStatus.slots.find(function(s){ return s.slot === todayStatus.currentSlot && s.completed; });
+      const slotDone = todayStatus && todayStatus.slots.find(function(s){ return s.slot === selectedSlot && s.completed; });
       btnCapture.disabled = !ready || !!slotDone;
+      btnCapture.textContent = slotDone ? 'สแกนซ้ำไม่ได้' : 'ถ่ายภาพ';
     }
 
     btnOpenCamera.addEventListener('click', openCamera);
