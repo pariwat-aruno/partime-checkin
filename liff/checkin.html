@@ -179,7 +179,9 @@
         return;
       }
 
-      nameEl.textContent = todayStatus.displayName + ' (' + todayStatus.employeeId + ')';
+      nameEl.textContent = todayStatus.displayName +
+        (todayStatus.nickname ? ' (' + todayStatus.nickname + ')' : '') +
+        ' — ' + todayStatus.employeeId;
       renderSlotGrid(todayStatus);
 
       bootEl.style.display = 'none';
@@ -325,10 +327,12 @@
         let msg = '';
         if (result.alreadyScanned) {
           msg = 'slot นี้สแกนไปแล้ว';
-        } else if (result.completed) {
-          msg = 'เช็คอิน ' + result.slotLabel + ' สำเร็จแล้ว\nปิดหน้าจอได้';
         } else {
-          msg = 'เช็คอิน ' + result.slotLabel + ' สำเร็จแล้ว\nปิดหน้าจอได้';
+          const who = result.displayName
+            ? (result.displayName + (result.nickname ? ' (' + result.nickname + ')' : '') + '\n')
+            : '';
+          msg = who + 'เช็คอิน ' + result.slotLabel + ' สำเร็จแล้ว\nปิดหน้าจอได้';
+          if (result.isLate) msg += '\n⏰ มาสาย ' + result.lateMinutes + ' นาที';
         }
         okEl.style.whiteSpace = 'pre-line';
         okEl.textContent = msg;

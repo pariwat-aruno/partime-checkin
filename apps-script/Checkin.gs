@@ -130,8 +130,17 @@ function checkin(payload) {
       distance: distance, outOfRange: slotOutOfRange,
     });
 
+    // คำนวณมาสาย — อ้างเวลาสแกน slot1 (= เวลาเข้างานจริง)
+    const slot1At = (slot === 1) ? nowBangkok() : sh.getRange(rowNum, colIdx['slot1_at']).getValue();
+    const lateMinutes = lateMinutes_(slot1At, cfg);
+    const graceMin = Number(cfg.late_grace_minutes) || 0;
+    const isLate = lateMinutes > graceMin;
+    if (slot === 1 && colIdx['late_minutes']) {
+      sh.getRange(rowNum, colIdx['late_minutes']).setValue(lateMinutes);
+    }
+
     // push flex card หา owner ทุกคน — ทุก slot
-    // slot 1-3 = progress card (ไม่มีปุ่ม), slot 4 = approval card (3 ปุ่ม + 4 รูป)
+    // slot 1-3 = progress card (ไม่มีปุ่ม), slot 4 = notify card (รับทราบ / ไม่มาทำงาน)
     let completed = false;
     try {
       if (newScanCount === 4) {
@@ -142,6 +151,7 @@ function checkin(payload) {
         const card = buildApprovalCard({
           checkinId: checkinId,
           displayName: emp.display_name,
+          nickname: emp.nickname,
           phone: emp.phone,
           date: today,
           slots: slots,
@@ -150,11 +160,15 @@ function checkin(payload) {
           radiusM: Number(cfg.geofence_radius_m),
           hasOutOfRange: hasOutOfRange,
           scanCount: newScanCount,
+          lateMinutes: lateMinutes,
+          isLate: isLate,
+          graceMinutes: graceMin,
         });
         pushToAllOwners([card]);
       } else {
         const card = buildScanProgressCard({
           displayName: emp.display_name,
+          nickname: emp.nickname,
           employeeId: emp.employee_id,
           checkinId: sh.getRange(rowNum, colIdx['checkin_id']).getValue(),
           slot: slot,
@@ -165,6 +179,8 @@ function checkin(payload) {
           radiusM: Number(cfg.geofence_radius_m),
           outOfRange: slotOutOfRange,
           at: nowBangkok(),
+          lateMinutes: lateMinutes,
+          isLate: isLate,
         });
         pushToAllOwners([card]);
       }
@@ -175,11 +191,15 @@ function checkin(payload) {
     return {
       ok: true,
       checkinId: sh.getRange(rowNum, colIdx['checkin_id']).getValue(),
+      displayName: emp.display_name,
+      nickname: emp.nickname || '',
       slot: slot,
       slotLabel: slotLabel,
       scanCount: newScanCount,
       distanceM: distance,
       outOfRange: slotOutOfRange,
+      lateMinutes: lateMinutes,
+      isLate: isLate,
       completed: completed,
     };
   } finally {
@@ -271,6 +291,7 @@ function getTodayStatus(payload) {
     ok: true,
     employeeId: emp.employee_id,
     displayName: emp.display_name,
+    nickname: emp.nickname || '',
     date: today,
     currentSlot: getCurrentSlot(cfg),
     currentSlotLabel: getSlotLabel(cfg, getCurrentSlot(cfg)),

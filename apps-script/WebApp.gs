@@ -383,6 +383,21 @@ function handlePostback_(ev) {
     return replyText(ev.replyToken, result.message);
   }
 
+  // รับทราบการสแกน (ไม่เปลี่ยนสถานะ — สรุปเต็ม/ครึ่งไปทำตอน /endtoday)
+  if (data.action === 'acknowledge') {
+    const c = readCheckinById_(data.id);
+    const emp = c ? findEmployeeById_(c.employee_id) : null;
+    logOwnerAction(userId, 'acknowledge', data.id, emp ? emp.display_name : data.id, {});
+    return replyText(ev.replyToken, '✓ รับทราบการเข้างาน' + (emp ? ' ' + employeeDisplay_(emp) : ''));
+  }
+
+  // ไม่มาทำงาน → wage 0
+  if (data.action === 'absent') {
+    const result = markCheckinAbsent_(data.id, userId);
+    if (!result.ok) return replyText(ev.replyToken, '❌ ' + result.error);
+    return replyText(ev.replyToken, '🚫 บันทึก "ไม่มาทำงาน" — ' + result.empName + ' (ค่าจ้าง 0)');
+  }
+
   return replyText(ev.replyToken, 'unknown action: ' + data.action);
 }
 
@@ -394,6 +409,38 @@ function parsePostbackData_(s) {
     out[kv[0]] = decodeURIComponent(kv[1] || '');
   });
   return out;
+}
+
+/** "ชื่อ (ชื่อเล่น)" */
+function employeeDisplay_(emp) {
+  if (!emp) return '';
+  return emp.display_name + (emp.nickname ? ' (' + emp.nickname + ')' : '');
+}
+
+/** ทำเครื่องหมาย checkin = ไม่มาทำงาน (wage 0) */
+function markCheckinAbsent_(checkinId, ownerUserId) {
+  const c = readCheckinById_(checkinId);
+  if (!c) return { ok: false, error: 'checkin_not_found: ' + checkinId };
+  const sheetId = PropertiesService.getScriptProperties().getProperty('SHEET_ID');
+  const sh = SpreadsheetApp.openById(sheetId).getSheetByName('Checkins');
+  const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+  const row = c._rowNumber;
+  const setCol = function (name, val) {
+    const i = headers.indexOf(name);
+    if (i >= 0) sh.getRange(row, i + 1).setValue(val);
+  };
+  setCol('status', 'absent');
+  setCol('day_type', 'absent');
+  setCol('wage', 0);
+  setCol('late_deduction', 0);
+  setCol('approved_at', nowBangkok());
+
+  const emp = findEmployeeById_(c.employee_id);
+  const empName = emp ? employeeDisplay_(emp) : c.employee_id;
+  logOwnerAction(ownerUserId, 'mark_absent', checkinId, emp ? emp.display_name : c.employee_id, {
+    date: String(c.checkin_date),
+  });
+  return { ok: true, empName: empName };
 }
 
 /**
@@ -418,11 +465,18 @@ function updateCheckinStatus_(checkinId, action, type, ownerUserId) {
   if (rowIdx < 0) return { ok: false, error: 'checkin_not_found: ' + checkinId };
 
   const cfg = getConfig();
-  let status, dayType, wage;
-  if (action === 'approve' && type === 'full') {
-    status = 'approved'; dayType = 'full'; wage = Number(cfg.wage_full_day);
-  } else if (action === 'approve' && type === 'half') {
-    status = 'approved'; dayType = 'half'; wage = Number(cfg.wage_half_day);
+  const iEmp = headers.indexOf('employee_id');
+  const iDate = headers.indexOf('checkin_date');
+  const iSlot1 = headers.indexOf('slot1_at');
+  const rowData0 = sh.getRange(rowIdx, 1, 1, sh.getLastColumn()).getValues()[0];
+  const emp0 = findEmployeeById_(rowData0[iEmp]);
+  const slot1At0 = iSlot1 >= 0 ? rowData0[iSlot1] : '';
+
+  let status, dayType, wage, lateMin = 0, deduction = 0;
+  if (action === 'approve' && (type === 'full' || type === 'half')) {
+    status = 'approved'; dayType = type;
+    const w = computeWage_(emp0, slot1At0, dayType, 0, cfg);
+    wage = w.net; lateMin = w.lateMinutes; deduction = w.deduction;
   } else if (action === 'reject') {
     status = 'rejected'; dayType = 'none'; wage = 0;
   } else {
@@ -433,12 +487,14 @@ function updateCheckinStatus_(checkinId, action, type, ownerUserId) {
   const iDayType = headers.indexOf('day_type') + 1;
   const iWage = headers.indexOf('wage') + 1;
   const iApprovedAt = headers.indexOf('approved_at') + 1;
-  const iEmp = headers.indexOf('employee_id');
-  const iDate = headers.indexOf('checkin_date');
+  const iLateMin = headers.indexOf('late_minutes');
+  const iLateDed = headers.indexOf('late_deduction');
 
   sh.getRange(rowIdx, iStatus).setValue(status);
   sh.getRange(rowIdx, iDayType).setValue(dayType);
   sh.getRange(rowIdx, iWage).setValue(wage);
+  if (iLateMin >= 0) sh.getRange(rowIdx, iLateMin + 1).setValue(lateMin);
+  if (iLateDed >= 0) sh.getRange(rowIdx, iLateDed + 1).setValue(deduction);
   sh.getRange(rowIdx, iApprovedAt).setValue(nowBangkok());
 
   // ดึงชื่อ employee สำหรับ reply

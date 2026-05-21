@@ -60,13 +60,25 @@ function buildApprovalCard(args) {
     : formatKmM_(args.lastDistanceM);
   const distanceColor = hasOutOfRange ? CHERRY_DARK : TEXT;
 
+  const nameText = args.displayName + (args.nickname ? ' (' + args.nickname + ')' : '');
   const bodyContents = slotImages.concat([
     { type: 'separator', margin: 'md' },
-    infoRow_('ชื่อ', args.displayName),
+    infoRow_('ชื่อ', nameText),
     infoRow_('วัน', dateText),
     infoRow_('สแกน', scanCount + '/4'),
     infoRowColored_('ระยะล่าสุด', distanceText, distanceColor),
   ]);
+
+  if (args.isLate) {
+    bodyContents.push({
+      type: 'box', layout: 'vertical', margin: 'sm',
+      paddingAll: '10px', backgroundColor: '#fef3c7', cornerRadius: '6px',
+      contents: [{
+        type: 'text', text: '⏰ มาสาย ' + args.lateMinutes + ' นาที (เกิน ' + (args.graceMinutes || 0) + ' นาที)',
+        size: 'sm', color: WARNING, weight: 'bold', wrap: true,
+      }],
+    });
+  }
 
   if (incomplete) {
     bodyContents.push({
@@ -114,17 +126,14 @@ function buildApprovalCard(args) {
       footer: {
         type: 'box', layout: 'vertical', spacing: 'sm',
         contents: [
+          { type: 'text', text: 'สรุปเต็มวัน/ครึ่งวัน เลือกตอนปิดวัน (/endtoday)', size: 'xxs', color: MUTED, wrap: true, align: 'center' },
           {
             type: 'box', layout: 'horizontal', spacing: 'sm',
             contents: [
-              actionButton_('เต็มวัน 400', 'action=approve&id=' + args.checkinId + '&type=full', CHERRY),
-              actionButton_('ครึ่งวัน 200', 'action=approve&id=' + args.checkinId + '&type=half', CHERRY_DARK),
+              actionButton_('รับทราบ', 'action=acknowledge&id=' + args.checkinId, CHERRY),
+              actionButton_('ไม่มาทำงาน', 'action=absent&id=' + args.checkinId, REJECT),
             ],
           },
-          actionButton_('ไม่อนุมัติ', 'action=reject&id=' + args.checkinId, REJECT),
-          ...(hasOutOfRange ? [
-            actionButton_('รับทราบ', 'action=ack_out_of_range&id=' + args.checkinId, '#6b7280'),
-          ] : []),
         ],
       },
     },
@@ -158,7 +167,7 @@ function buildScanProgressCard(args) {
             ],
           },
           { type: 'text', text: headerLabel, color: '#ffffff', weight: 'bold', size: 'md', wrap: true, margin: 'md' },
-          { type: 'text', text: time + '  •  ' + args.displayName, color: '#ffffff', size: 'xs', margin: 'sm' },
+          { type: 'text', text: time + '  •  ' + args.displayName + (args.nickname ? ' (' + args.nickname + ')' : ''), color: '#ffffff', size: 'xs', margin: 'sm' },
         ],
       },
       body: {
@@ -170,9 +179,17 @@ function buildScanProgressCard(args) {
             size: 'full', aspectMode: 'cover', aspectRatio: '1:1',
           },
           { type: 'separator', margin: 'sm' },
-          infoRow_('พนักงาน', args.employeeId + ' — ' + args.displayName),
+          infoRow_('พนักงาน', args.employeeId + ' — ' + args.displayName + (args.nickname ? ' (' + args.nickname + ')' : '')),
           infoRowColored_('ระยะ', distanceText, distanceColor),
           infoRow_('สแกนแล้ว', args.scanCount + '/4'),
+          ...(args.isLate ? [{
+            type: 'box', layout: 'vertical', margin: 'sm',
+            paddingAll: '8px', backgroundColor: '#fef3c7', cornerRadius: '6px',
+            contents: [{
+              type: 'text', text: '⏰ มาสาย ' + args.lateMinutes + ' นาที', size: 'sm',
+              color: WARNING, weight: 'bold', wrap: true, align: 'center',
+            }],
+          }] : []),
           ...(args.outOfRange ? [{
             type: 'box', layout: 'vertical', margin: 'sm',
             paddingAll: '10px', backgroundColor: '#fef2f2', cornerRadius: '6px',
