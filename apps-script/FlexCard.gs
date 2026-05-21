@@ -478,7 +478,11 @@ function driveUrlToThumbnail_(url) {
 function formatBangkokDateOnly_(d) {
   if (!d) return '';
   const dt = (d instanceof Date) ? d : new Date(d);
-  return Utilities.formatDate(dt, 'Asia/Bangkok', 'd MMM yyyy');
+  const M = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  const day = Utilities.formatDate(dt, 'Asia/Bangkok', 'd');
+  const mi = Number(Utilities.formatDate(dt, 'Asia/Bangkok', 'M')) - 1;
+  const year = Utilities.formatDate(dt, 'Asia/Bangkok', 'yyyy');
+  return day + ' ' + M[mi] + ' ' + year;
 }
 
 function formatBangkokTimeOnly_(d) {

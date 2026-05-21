@@ -274,7 +274,11 @@ function restorePaymentPending(payload) {
 
 function formatBangkokDateTime__(d) {
   const dt = (d instanceof Date) ? d : new Date(d);
-  return Utilities.formatDate(dt, 'Asia/Bangkok', 'd MMM yyyy HH:mm');
+  const M = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  const day = Utilities.formatDate(dt, 'Asia/Bangkok', 'd');
+  const mi = Number(Utilities.formatDate(dt, 'Asia/Bangkok', 'M')) - 1;
+  const time = Utilities.formatDate(dt, 'Asia/Bangkok', 'HH:mm');
+  return day + ' ' + M[mi] + ' ' + time + ' น.';
 }
 
 /**
