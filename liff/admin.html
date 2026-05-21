@@ -211,6 +211,7 @@
     .list-row .sub { color: var(--muted); font-size: 11px; }
     .list-row.terminated { opacity: 0.6; }
     .tag-term { background: #fee2e2; color: #991b1b; padding: 1px 7px; border-radius: 8px; font-size: 10px; }
+    .tag-active { background: #dcfce7; color: #166534; padding: 1px 7px; border-radius: 8px; font-size: 10px; }
     #detail-modal {
       position: fixed; inset: 0; background: rgba(17,24,39,0.85);
       z-index: 9999; padding: 16px; overflow-y: auto;
@@ -1002,10 +1003,12 @@
       allEmpList.innerHTML = head + list.map(function (e) {
         const nick = e.nickname ? ' (' + escape_(e.nickname) + ')' : '';
         const wage = e.daily_wage == null ? def + ' (def)' : Number(e.daily_wage).toLocaleString();
-        const term = e.active ? '' : '<span class="tag-term">เลิกจ้าง</span>';
+        const badge = e.active
+          ? '<span class="tag-active">ทำงานอยู่</span>'
+          : '<span class="tag-term">เลิกจ้างแล้ว</span>';
         return '<div class="list-row' + (e.active ? '' : ' terminated') + '" data-emp="' + e.employee_id + '">' +
           avatarImg_(e.selfie_url) +
-          '<div style="flex:1"><div><b>' + escape_(e.display_name) + '</b>' + nick + ' ' + term + '</div>' +
+          '<div style="flex:1"><div><b>' + escape_(e.display_name) + '</b>' + nick + ' ' + badge + '</div>' +
           '<div class="sub">' + escape_(e.employee_id) + ' • ' + escape_(e.phone || '-') +
           ' • มา ' + e.times_worked + ' ครั้ง • ค่าจ้าง ' + wage + '</div></div>' +
           '<div style="text-align:right"><div><b>' + Number(e.total_earned).toLocaleString() + '฿</b></div>' +
