@@ -106,7 +106,7 @@ function computeWage_(emp, slot1At, dayType, workHours, cfg) {
 // ========================================================================
 // เทส — กด Run บน testComputeWage_ ใน Apps Script editor (ดูผลใน Logs)
 // ========================================================================
-function testComputeWage_() {
+function testComputeWage() {
   var cfg = { wage_default: 400, late_grace_minutes: 15, work_start_time: '08:00' };
   var emp = { daily_wage: '' }; // ใช้ default 400
 
