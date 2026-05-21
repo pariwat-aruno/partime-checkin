@@ -74,6 +74,11 @@ function routeAction_(action, payload) {
     case 'getSettings':           return getSettings(payload);
     case 'saveSettings':          return saveSettings(payload);
     case 'setEmployeeWage':       return setEmployeeWage(payload);
+    // owner lists / reports / history / detail (P5)
+    case 'getAllEmployees':       return getAllEmployees(payload);
+    case 'getEmployeeDetail':     return getEmployeeDetail(payload);
+    case 'getPaymentReport':      return getPaymentReport(payload);
+    case 'getWorkHistory':        return getWorkHistory(payload);
     default:
       return { ok: false, error: 'unknown_action', action: action };
   }

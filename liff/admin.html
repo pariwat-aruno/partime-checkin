@@ -137,6 +137,61 @@
     }
     .emp-wage { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
     .emp-wage b { color: var(--cherry-dark); }
+
+    /* P5 panels */
+    .panel { margin-bottom: 12px; }
+    .panel > summary {
+      cursor: pointer; padding: 12px 14px; background: var(--bg);
+      border: 1px solid var(--border); border-radius: 10px;
+      font-weight: 600; font-size: 14px; color: var(--text);
+      list-style: none; user-select: none;
+    }
+    .panel > summary::-webkit-details-marker { display: none; }
+    .panel[open] > summary { border-radius: 10px 10px 0 0; background: var(--cherry-tint); }
+    .panel-body {
+      border: 1px solid var(--border); border-top: none;
+      border-radius: 0 0 10px 10px; padding: 12px; background: var(--white);
+    }
+    .seg { display: flex; gap: 0; margin-bottom: 10px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+    .seg button {
+      flex: 1; padding: 9px 4px; font-size: 13px; background: var(--white);
+      border: none; border-right: 1px solid var(--border); color: var(--muted); margin: 0;
+    }
+    .seg button:last-child { border-right: none; }
+    .seg button.active { background: var(--cherry); color: #fff; font-weight: 600; }
+    .rep-controls { display: flex; gap: 8px; margin-bottom: 10px; }
+    .rep-controls input { flex: 1; margin: 0; }
+    .rep-controls button { width: auto; flex: 0 0 auto; padding: 11px 16px; }
+    .rep-summary {
+      display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap;
+    }
+    .rep-summary .box {
+      flex: 1; min-width: 90px; background: var(--bg); border: 1px solid var(--border);
+      border-radius: 8px; padding: 10px; text-align: center;
+    }
+    .rep-summary .box .n { font-weight: 700; font-size: 16px; color: var(--cherry); }
+    .rep-summary .box .l { font-size: 11px; color: var(--muted); }
+    .list-row {
+      display: flex; justify-content: space-between; gap: 8px;
+      border: 1px solid var(--border); border-radius: 8px;
+      padding: 10px; margin-bottom: 6px; font-size: 13px; cursor: pointer;
+    }
+    .list-row .sub { color: var(--muted); font-size: 11px; }
+    .list-row.terminated { opacity: 0.6; }
+    .tag-term { background: #fee2e2; color: #991b1b; padding: 1px 7px; border-radius: 8px; font-size: 10px; }
+    #detail-modal {
+      position: fixed; inset: 0; background: rgba(17,24,39,0.85);
+      z-index: 9999; padding: 16px; overflow-y: auto;
+    }
+    #detail-modal .inner {
+      max-width: 480px; margin: 0 auto; background: var(--white);
+      border-radius: 12px; padding: 20px;
+    }
+    #detail-modal h2 { font-size: 16px; margin: 0 0 14px; color: var(--cherry); font-weight: 700; }
+    #detail-modal .close-btn {
+      width: 100%; padding: 11px; background: var(--reject); color: var(--white);
+      border: none; border-radius: 8px; font-weight: 600; margin-top: 8px;
+    }
     .log-item {
       padding: 10px 8px; border-bottom: 1px solid var(--border);
       font-size: 13px;
@@ -199,6 +254,49 @@
       </div>
       <div id="emp-list"></div>
 
+      <details id="all-emp-section" class="panel">
+        <summary>👥 พนักงานทั้งหมด</summary>
+        <div class="panel-body">
+          <div class="seg" id="emp-filter">
+            <button data-f="active" class="active">ยังทำงาน</button>
+            <button data-f="all">ทั้งหมด</button>
+          </div>
+          <div id="all-emp-list"><div class="muted">กดเพื่อโหลด...</div></div>
+        </div>
+      </details>
+
+      <details id="pay-report-section" class="panel">
+        <summary>💰 รายงานยอดจ่าย</summary>
+        <div class="panel-body">
+          <div class="seg" id="pay-gran">
+            <button data-g="day">รายวัน</button>
+            <button data-g="month" class="active">รายเดือน</button>
+            <button data-g="year">รายปี</button>
+          </div>
+          <div class="rep-controls">
+            <input type="text" id="pay-date" placeholder="2026-05" />
+            <button id="btn-pay-report" class="btn-primary">โหลด</button>
+          </div>
+          <div id="pay-report-result"></div>
+        </div>
+      </details>
+
+      <details id="work-hist-section" class="panel">
+        <summary>📅 ย้อนหลัง — ใครมาทำงาน</summary>
+        <div class="panel-body">
+          <div class="seg" id="hist-gran">
+            <button data-g="day" class="active">รายวัน</button>
+            <button data-g="month">รายเดือน</button>
+            <button data-g="year">รายปี</button>
+          </div>
+          <div class="rep-controls">
+            <input type="text" id="hist-date" placeholder="2026-05-21" />
+            <button id="btn-work-hist" class="btn-primary">โหลด</button>
+          </div>
+          <div id="work-hist-result"></div>
+        </div>
+      </details>
+
       <details id="log-section">
         <summary>📋 บันทึกกิจกรรม owner</summary>
         <div id="log-body">
@@ -223,6 +321,14 @@
       <h2 id="history-title">ประวัติ</h2>
       <div id="history-body"></div>
       <button class="close-btn" id="history-close">ปิด</button>
+    </div>
+  </div>
+
+  <div id="detail-modal" hidden>
+    <div class="inner">
+      <h2 id="detail-title">รายละเอียดพนักงาน</h2>
+      <div id="detail-body"></div>
+      <button class="close-btn" id="detail-close">ปิด</button>
     </div>
   </div>
 
@@ -722,6 +828,174 @@
         await load();
       } catch (e) {
         alert('ผิดพลาด: ' + (e.code === 'invalid_wage' ? 'ค่าจ้างต้องเป็นตัวเลข > 0' : (e.message || e.code)));
+      }
+    }
+
+    // ===== P5: พนักงานทั้งหมด =====
+    const allEmpSection = document.getElementById('all-emp-section');
+    const allEmpList = document.getElementById('all-emp-list');
+    let allEmpCache = null;
+    let empFilter = 'active';
+
+    allEmpSection.addEventListener('toggle', function () {
+      if (allEmpSection.open && !allEmpCache) loadAllEmployees();
+    });
+    document.querySelectorAll('#emp-filter button').forEach(function (b) {
+      b.addEventListener('click', function () {
+        document.querySelectorAll('#emp-filter button').forEach(function (x) { x.classList.remove('active'); });
+        b.classList.add('active');
+        empFilter = b.dataset.f;
+        renderAllEmployees();
+      });
+    });
+
+    async function loadAllEmployees() {
+      allEmpList.innerHTML = '<div class="muted">กำลังโหลด...</div>';
+      try {
+        allEmpCache = await api.post('getAllEmployees', { lineUserId: state.lineUserId });
+        renderAllEmployees();
+      } catch (e) {
+        allEmpList.innerHTML = '<div class="error">ผิดพลาด: ' + (e.message || e.code) + '</div>';
+      }
+    }
+
+    function renderAllEmployees() {
+      if (!allEmpCache) return;
+      const def = allEmpCache.default_wage;
+      let list = allEmpCache.employees;
+      if (empFilter === 'active') list = list.filter(function (e) { return e.active; });
+      const head = '<div class="muted" style="margin-bottom:8px">ทั้งหมด ' + allEmpCache.total +
+        ' • ยังทำงาน ' + allEmpCache.active_count + '</div>';
+      if (list.length === 0) { allEmpList.innerHTML = head + '<div class="muted">ไม่มีรายชื่อ</div>'; return; }
+      allEmpList.innerHTML = head + list.map(function (e) {
+        const nick = e.nickname ? ' (' + escape_(e.nickname) + ')' : '';
+        const wage = e.daily_wage == null ? def + ' (def)' : Number(e.daily_wage).toLocaleString();
+        const term = e.active ? '' : '<span class="tag-term">เลิกจ้าง</span>';
+        return '<div class="list-row' + (e.active ? '' : ' terminated') + '" data-emp="' + e.employee_id + '">' +
+          '<div><div><b>' + escape_(e.display_name) + '</b>' + nick + ' ' + term + '</div>' +
+          '<div class="sub">' + escape_(e.employee_id) + ' • ' + escape_(e.phone || '-') +
+          ' • มา ' + e.times_worked + ' ครั้ง • ค่าจ้าง ' + wage + '</div></div>' +
+          '<div style="text-align:right"><div><b>' + Number(e.total_earned).toLocaleString() + '฿</b></div>' +
+          '<div class="sub">ได้รวม</div></div>' +
+        '</div>';
+      }).join('');
+      allEmpList.querySelectorAll('.list-row').forEach(function (r) {
+        r.addEventListener('click', function () { openDetail(r.dataset.emp); });
+      });
+    }
+
+    // ===== P5: รายละเอียดพนักงาน =====
+    const dmodal = document.getElementById('detail-modal');
+    const dtitle = document.getElementById('detail-title');
+    const dbody = document.getElementById('detail-body');
+    document.getElementById('detail-close').addEventListener('click', function () { dmodal.hidden = true; });
+
+    async function openDetail(employeeId) {
+      dmodal.hidden = false;
+      dtitle.textContent = 'รายละเอียด — ' + employeeId;
+      dbody.innerHTML = '<div class="muted">กำลังโหลด...</div>';
+      try {
+        const r = await api.post('getEmployeeDetail', { lineUserId: state.lineUserId, employeeId: employeeId });
+        dtitle.textContent = r.display_name + (r.nickname ? ' (' + r.nickname + ')' : '');
+        const wage = r.daily_wage == null ? (r.default_wage + ' (default)') : Number(r.daily_wage).toLocaleString();
+        const status = r.active ? 'ยังทำงาน' : ('เลิกจ้าง ' + (r.terminated_at || ''));
+        const pays = (r.payments || []).map(function (p) {
+          const slip = p.slip_url ? ' • <a href="' + escape_(p.slip_url) + '" target="_blank">สลิป</a>' : '';
+          return '<div class="history-row"><div class="top"><span>' + escape_(p.period) + '</span><span>' + escape_(p.status) + '</span></div>' +
+            '<div class="meta">' + Number(p.total_amount).toLocaleString() + ' บาท • ปิด ' + escape_(p.closed_at || '-') +
+            (p.paid_at ? ' • จ่าย ' + escape_(p.paid_at) : '') + slip + '</div></div>';
+        }).join('') || '<div class="muted">ยังไม่มีรอบจ่าย</div>';
+        dbody.innerHTML =
+          '<div class="rep-summary">' +
+            '<div class="box"><div class="n">' + r.days_worked + '</div><div class="l">มาทำงาน(ครั้ง)</div></div>' +
+            '<div class="box"><div class="n">' + Number(r.total_earned).toLocaleString() + '</div><div class="l">ได้รวม ฿</div></div>' +
+            '<div class="box"><div class="n">' + Number(r.paid_total).toLocaleString() + '</div><div class="l">จ่ายแล้ว ฿</div></div>' +
+          '</div>' +
+          '<div class="emp-wage">สถานะ: <b>' + escape_(status) + '</b> • ค่าจ้าง <b>' + wage + '</b>/วัน</div>' +
+          '<div class="emp-wage">' + escape_(r.bank_name || '-') + ' ' + escape_(r.bank_account_no || '') + ' • โทร ' + escape_(r.phone || '-') + '</div>' +
+          '<div class="history-section"><h3>รอบจ่าย</h3>' + pays + '</div>';
+      } catch (e) {
+        dbody.innerHTML = '<div class="error">ผิดพลาด: ' + (e.message || e.code) + '</div>';
+      }
+    }
+
+    // ===== P5: รายงานยอดจ่าย =====
+    setupSeg('pay-gran', function (g) { document.getElementById('pay-date').value = defaultDateFor_(g); });
+    setupSeg('hist-gran', function (g) { document.getElementById('hist-date').value = defaultDateFor_(g); });
+    document.getElementById('pay-date').value = defaultDateFor_('month');
+    document.getElementById('hist-date').value = defaultDateFor_('day');
+
+    document.getElementById('btn-pay-report').addEventListener('click', loadPayReport);
+    document.getElementById('btn-work-hist').addEventListener('click', loadWorkHist);
+
+    function setupSeg(id, onChange) {
+      document.querySelectorAll('#' + id + ' button').forEach(function (b) {
+        b.addEventListener('click', function () {
+          document.querySelectorAll('#' + id + ' button').forEach(function (x) { x.classList.remove('active'); });
+          b.classList.add('active');
+          onChange(b.dataset.g);
+        });
+      });
+    }
+    function activeGran(id) {
+      const b = document.querySelector('#' + id + ' button.active');
+      return b ? b.dataset.g : 'month';
+    }
+    function defaultDateFor_(g) {
+      const d = new Date();
+      const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, '0'), day = String(d.getDate()).padStart(2, '0');
+      if (g === 'day') return y + '-' + m + '-' + day;
+      if (g === 'year') return String(y);
+      return y + '-' + m;
+    }
+
+    async function loadPayReport() {
+      const g = activeGran('pay-gran');
+      const date = document.getElementById('pay-date').value.trim();
+      const el = document.getElementById('pay-report-result');
+      el.innerHTML = '<div class="muted">กำลังโหลด...</div>';
+      try {
+        const r = await api.post('getPaymentReport', { lineUserId: state.lineUserId, granularity: g, date: date });
+        const items = r.items.map(function (it) {
+          return '<div class="list-row"><div><b>' + escape_(it.name) + '</b>' +
+            '<div class="sub">' + escape_(it.period) + ' • ' + escape_(it.status) + (it.paid_at ? ' • ' + escape_(it.paid_at) : '') + '</div></div>' +
+            '<div><b>' + Number(it.total_amount).toLocaleString() + '฿</b></div></div>';
+        }).join('') || '<div class="muted">ไม่มีรายการ</div>';
+        el.innerHTML =
+          '<div class="rep-summary">' +
+            '<div class="box"><div class="n">' + Number(r.total).toLocaleString() + '</div><div class="l">รวม ฿</div></div>' +
+            '<div class="box"><div class="n">' + Number(r.paid).toLocaleString() + '</div><div class="l">จ่ายแล้ว</div></div>' +
+            '<div class="box"><div class="n">' + Number(r.unpaid).toLocaleString() + '</div><div class="l">ค้างจ่าย</div></div>' +
+            '<div class="box"><div class="n">' + r.count + '</div><div class="l">รายการ</div></div>' +
+          '</div>' + items;
+      } catch (e) {
+        el.innerHTML = '<div class="error">ผิดพลาด: ' + (e.message || e.code) + '</div>';
+      }
+    }
+
+    async function loadWorkHist() {
+      const g = activeGran('hist-gran');
+      const date = document.getElementById('hist-date').value.trim();
+      const el = document.getElementById('work-hist-result');
+      el.innerHTML = '<div class="muted">กำลังโหลด...</div>';
+      try {
+        const r = await api.post('getWorkHistory', { lineUserId: state.lineUserId, granularity: g, date: date });
+        const rows = r.byEmployee.map(function (e) {
+          const nick = e.nickname ? ' (' + escape_(e.nickname) + ')' : '';
+          return '<div class="list-row" data-emp="' + e.employee_id + '"><div><b>' + escape_(e.name) + '</b>' + nick +
+            '<div class="sub">' + e.days + ' ครั้ง</div></div><div><b>' + Number(e.wage).toLocaleString() + '฿</b></div></div>';
+        }).join('') || '<div class="muted">ไม่มีใครมาทำงานในช่วงนี้</div>';
+        el.innerHTML =
+          '<div class="rep-summary">' +
+            '<div class="box"><div class="n">' + r.byEmployee.length + '</div><div class="l">คน</div></div>' +
+            '<div class="box"><div class="n">' + r.total_days + '</div><div class="l">วัน-คน</div></div>' +
+            '<div class="box"><div class="n">' + Number(r.total_wage).toLocaleString() + '</div><div class="l">ค่าจ้างรวม ฿</div></div>' +
+          '</div>' + rows;
+        el.querySelectorAll('.list-row[data-emp]').forEach(function (rw) {
+          rw.addEventListener('click', function () { openDetail(rw.dataset.emp); });
+        });
+      } catch (e) {
+        el.innerHTML = '<div class="error">ผิดพลาด: ' + (e.message || e.code) + '</div>';
       }
     }
 
