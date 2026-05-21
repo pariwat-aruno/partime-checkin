@@ -170,6 +170,33 @@ function ensureSheetWithHeaders_(ss, name, headers) {
   }
 }
 
+/**
+ * migrateSchema — เติมคอลัมน์ใหม่ตาม SHEET_HEADERS ให้ชีตเดิม (ไม่ลบ/ไม่สลับของเดิม)
+ * ปลอดภัย: append เฉพาะหัวคอลัมน์ที่ยังไม่มี ต่อท้ายขวาสุด (โค้ดอ่านด้วย header อยู่แล้ว)
+ *
+ * วิธีใช้: กด Run บน migrateSchema (รันครั้งเดียวหลัง deploy โค้ดใหม่)
+ */
+function migrateSchema() {
+  const sheetId = findSheetId_();
+  const ss = SpreadsheetApp.openById(sheetId);
+  const added = [];
+  Object.keys(SHEET_HEADERS).forEach(function (name) {
+    const sh = ss.getSheetByName(name);
+    if (!sh) return;
+    const lastCol = sh.getLastColumn();
+    const current = sh.getRange(1, 1, 1, lastCol).getValues()[0];
+    SHEET_HEADERS[name].forEach(function (h) {
+      if (current.indexOf(h) >= 0) return;
+      const col = sh.getLastColumn() + 1;
+      sh.getRange(1, col).setValue(h).setFontWeight('bold').setBackground('#f0f0f0');
+      current.push(h);
+      added.push(name + '.' + h);
+    });
+  });
+  Logger.log('migrateSchema: เพิ่มคอลัมน์ %s', added.length ? added.join(', ') : '(ไม่มี — ครบแล้ว)');
+  return added;
+}
+
 // ========================================================================
 // TASK-02 — seed ค่าเริ่มต้นใน sheet Config
 // ========================================================================
