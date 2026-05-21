@@ -384,6 +384,8 @@ function getEmployeeHistory(payload) {
     ok: true,
     employeeId: payload.employeeId,
     displayName: emp.display_name,
+    nickname: emp.nickname || '',
+    selfie_url: emp.selfie_url || '',
     period: period,
     checkins: checkins,
     payments: payments,

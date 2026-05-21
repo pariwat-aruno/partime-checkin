@@ -6,6 +6,23 @@
   <title>Owner — บริษัท วอร์ด้า สกินแคร์ จำกัด</title>
   <link rel="stylesheet" href="./css/style.css" />
   <style>
+    /* เมนูหลัก + หน้าย่อย */
+    .menu-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .menu-card {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 8px; padding: 22px 10px; font-size: 14px; font-weight: 600;
+      background: var(--white); color: var(--text);
+      border: 1px solid var(--border); border-radius: 14px; margin: 0;
+      text-align: center; line-height: 1.3; min-height: 96px;
+    }
+    .menu-card:active { background: var(--cherry-tint); }
+    .menu-card .ic { font-size: 30px; }
+    .back-btn {
+      width: auto; background: none; color: var(--cherry-dark); border: none;
+      padding: 6px 0; font-size: 14px; font-weight: 600; margin: 0 0 6px;
+    }
+    .view-title { font-size: 18px; margin: 0 0 14px; color: var(--cherry); font-weight: 700; }
+
     .period-picker { display: flex; gap: 8px; margin-bottom: 16px; }
     .period-picker input[type="month"] { flex: 1; margin: 0; }
     .period-picker button { width: auto; padding: 12px 16px; flex: 0 0 auto; }
@@ -139,6 +156,19 @@
     .emp-wage b { color: var(--cherry-dark); }
     .bulk-bar { display: flex; gap: 8px; margin-bottom: 12px; }
     .bulk-bar button { flex: 1; padding: 11px; font-size: 13px; }
+    .closed-banner {
+      padding: 8px 10px; border-radius: 8px; font-size: 13px; font-weight: 700;
+      margin-bottom: 8px; text-align: center;
+    }
+    .closed-banner.pending { background: #fef3c7; color: #92400e; }
+    .closed-banner.paid { background: #dcfce7; color: #166534; }
+    .emp-thumb {
+      width: 44px; height: 44px; border-radius: 50%; object-fit: cover;
+      background: var(--bg); flex: 0 0 auto;
+    }
+    .list-row .emp-thumb { width: 40px; height: 40px; }
+    .detail-head { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+    .detail-head img { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; background: var(--bg); }
 
     /* P5 panels */
     .panel { margin-bottom: 12px; }
@@ -230,85 +260,102 @@
     <div id="loading" class="muted">กำลังโหลด...</div>
 
     <div id="content" style="display:none">
-      <details id="settings-section">
-        <summary>⚙️ ตั้งค่าระบบ</summary>
-        <div id="settings-body">
-          <div class="field">
-            <div class="label">ค่าจ้างเริ่มต้น (บาท/วัน)</div>
-            <input type="number" id="set-wage-default" min="1" step="1" />
-          </div>
-          <div class="field">
-            <div class="label">อนุญาตให้สายได้ (นาที) ก่อนเริ่มหัก</div>
-            <input type="number" id="set-grace" min="0" step="1" />
-          </div>
-          <div class="field">
-            <div class="label">เวลาเริ่มงานมาตรฐาน</div>
-            <input type="time" id="set-start" />
-          </div>
-          <button id="btn-save-settings" class="btn-primary">บันทึกการตั้งค่า</button>
-          <div id="settings-msg" class="muted" style="margin-top:8px"></div>
+      <!-- เมนูหลัก -->
+      <div id="view-home" class="view">
+        <div class="menu-grid">
+          <button class="menu-card" data-view="dashboard"><span class="ic">💰</span>ยอด & ปิดยอด</button>
+          <button class="menu-card" data-view="employees"><span class="ic">👥</span>พนักงานทั้งหมด</button>
+          <button class="menu-card" data-view="payreport"><span class="ic">📊</span>รายงานยอดจ่าย</button>
+          <button class="menu-card" data-view="workhist"><span class="ic">📅</span>ย้อนหลังใครมาทำงาน</button>
+          <button class="menu-card" data-view="settings"><span class="ic">⚙️</span>ตั้งค่าระบบ</button>
+          <button class="menu-card" data-view="log"><span class="ic">📋</span>บันทึกกิจกรรม</button>
         </div>
-      </details>
-
-      <div class="period-picker">
-        <input type="month" id="period" />
-        <button id="btn-refresh" class="btn-primary">โหลด</button>
       </div>
-      <div class="bulk-bar">
-        <button id="btn-bulk-close" class="btn-primary">ปิดยอดทุกคน</button>
-        <button id="btn-bulk-pay" class="btn-secondary">จ่ายแล้วทุกคน(รอจ่าย)</button>
+
+      <!-- ยอด & ปิดยอด -->
+      <div id="view-dashboard" class="view" hidden>
+        <button class="back-btn" data-back>← เมนูหลัก</button>
+        <h2 class="view-title">💰 ยอด & ปิดยอด</h2>
+        <div class="period-picker">
+          <input type="month" id="period" />
+          <button id="btn-refresh" class="btn-primary">โหลด</button>
+        </div>
+        <div class="bulk-bar">
+          <button id="btn-bulk-close" class="btn-primary">ปิดยอดทุกคน</button>
+          <button id="btn-bulk-pay" class="btn-secondary">จ่ายแล้วทุกคน(รอจ่าย)</button>
+        </div>
+        <div id="emp-list"></div>
       </div>
-      <div id="emp-list"></div>
 
-      <details id="all-emp-section" class="panel">
-        <summary>👥 พนักงานทั้งหมด</summary>
-        <div class="panel-body">
-          <div class="seg" id="emp-filter">
-            <button data-f="active" class="active">ยังทำงาน</button>
-            <button data-f="all">ทั้งหมด</button>
-          </div>
-          <div id="all-emp-list"><div class="muted">กดเพื่อโหลด...</div></div>
+      <!-- พนักงานทั้งหมด -->
+      <div id="view-employees" class="view" hidden>
+        <button class="back-btn" data-back>← เมนูหลัก</button>
+        <h2 class="view-title">👥 พนักงานทั้งหมด</h2>
+        <div class="seg" id="emp-filter">
+          <button data-f="active" class="active">ยังทำงาน</button>
+          <button data-f="all">ทั้งหมด</button>
         </div>
-      </details>
+        <div id="all-emp-list"><div class="muted">กำลังโหลด...</div></div>
+      </div>
 
-      <details id="pay-report-section" class="panel">
-        <summary>💰 รายงานยอดจ่าย</summary>
-        <div class="panel-body">
-          <div class="seg" id="pay-gran">
-            <button data-g="day">รายวัน</button>
-            <button data-g="month" class="active">รายเดือน</button>
-            <button data-g="year">รายปี</button>
-          </div>
-          <div class="rep-controls">
-            <input type="text" id="pay-date" placeholder="2026-05" />
-            <button id="btn-pay-report" class="btn-primary">โหลด</button>
-          </div>
-          <div id="pay-report-result"></div>
+      <!-- รายงานยอดจ่าย -->
+      <div id="view-payreport" class="view" hidden>
+        <button class="back-btn" data-back>← เมนูหลัก</button>
+        <h2 class="view-title">📊 รายงานยอดจ่าย</h2>
+        <div class="seg" id="pay-gran">
+          <button data-g="day">รายวัน</button>
+          <button data-g="month" class="active">รายเดือน</button>
+          <button data-g="year">รายปี</button>
         </div>
-      </details>
+        <div class="rep-controls">
+          <input type="text" id="pay-date" placeholder="2026-05" />
+          <button id="btn-pay-report" class="btn-primary">โหลด</button>
+        </div>
+        <div id="pay-report-result"></div>
+      </div>
 
-      <details id="work-hist-section" class="panel">
-        <summary>📅 ย้อนหลัง — ใครมาทำงาน</summary>
-        <div class="panel-body">
-          <div class="seg" id="hist-gran">
-            <button data-g="day" class="active">รายวัน</button>
-            <button data-g="month">รายเดือน</button>
-            <button data-g="year">รายปี</button>
-          </div>
-          <div class="rep-controls">
-            <input type="text" id="hist-date" placeholder="2026-05-21" />
-            <button id="btn-work-hist" class="btn-primary">โหลด</button>
-          </div>
-          <div id="work-hist-result"></div>
+      <!-- ย้อนหลังใครมาทำงาน -->
+      <div id="view-workhist" class="view" hidden>
+        <button class="back-btn" data-back>← เมนูหลัก</button>
+        <h2 class="view-title">📅 ย้อนหลัง — ใครมาทำงาน</h2>
+        <div class="seg" id="hist-gran">
+          <button data-g="day" class="active">รายวัน</button>
+          <button data-g="month">รายเดือน</button>
+          <button data-g="year">รายปี</button>
         </div>
-      </details>
+        <div class="rep-controls">
+          <input type="text" id="hist-date" placeholder="2026-05-21" />
+          <button id="btn-work-hist" class="btn-primary">โหลด</button>
+        </div>
+        <div id="work-hist-result"></div>
+      </div>
 
-      <details id="log-section">
-        <summary>📋 บันทึกกิจกรรม owner</summary>
-        <div id="log-body">
-          <div class="muted">กดเพื่อโหลด...</div>
+      <!-- ตั้งค่าระบบ -->
+      <div id="view-settings" class="view" hidden>
+        <button class="back-btn" data-back>← เมนูหลัก</button>
+        <h2 class="view-title">⚙️ ตั้งค่าระบบ</h2>
+        <div class="field">
+          <div class="label">ค่าจ้างเริ่มต้น (บาท/วัน)</div>
+          <input type="number" id="set-wage-default" min="1" step="1" />
         </div>
-      </details>
+        <div class="field">
+          <div class="label">อนุญาตให้สายได้ (นาที) ก่อนเริ่มหัก</div>
+          <input type="number" id="set-grace" min="0" step="1" />
+        </div>
+        <div class="field">
+          <div class="label">เวลาเริ่มงานมาตรฐาน</div>
+          <input type="time" id="set-start" />
+        </div>
+        <button id="btn-save-settings" class="btn-primary">บันทึกการตั้งค่า</button>
+        <div id="settings-msg" class="muted" style="margin-top:8px"></div>
+      </div>
+
+      <!-- บันทึกกิจกรรม -->
+      <div id="view-log" class="view" hidden>
+        <button class="back-btn" data-back>← เมนูหลัก</button>
+        <h2 class="view-title">📋 บันทึกกิจกรรม owner</h2>
+        <div id="log-body"><div class="muted">กำลังโหลด...</div></div>
+      </div>
     </div>
   </div>
 
@@ -387,8 +434,30 @@
       loadingEl.style.display = 'none';
       contentEl.style.display = 'block';
       try { await loadSettings(); } catch (_) {} // รู้ค่าจ้าง default ก่อน render
-      await load();
+      showView('home');
     }
+
+    // ===== Router: เมนูหลัก ↔ หน้าย่อย =====
+    let dashboardLoaded = false;
+    function showView(name) {
+      document.querySelectorAll('#content .view').forEach(function (v) { v.hidden = true; });
+      const el = document.getElementById('view-' + name);
+      if (el) el.hidden = false;
+      window.scrollTo(0, 0);
+      // lazy-load ข้อมูลของแต่ละหน้า
+      if (name === 'dashboard') { load(); }
+      else if (name === 'employees') { loadAllEmployees(); }
+      else if (name === 'settings') { if (!settingsLoaded) loadSettings(); }
+      else if (name === 'log') { loadOwnerLogs(); }
+      else if (name === 'payreport') { if (!document.getElementById('pay-report-result').innerHTML.trim()) loadPayReport(); }
+      else if (name === 'workhist') { if (!document.getElementById('work-hist-result').innerHTML.trim()) loadWorkHist(); }
+    }
+    document.querySelectorAll('.menu-card[data-view]').forEach(function (b) {
+      b.addEventListener('click', function () { showView(b.dataset.view); });
+    });
+    document.querySelectorAll('[data-back]').forEach(function (b) {
+      b.addEventListener('click', function () { showView('home'); });
+    });
 
     async function load() {
       clearError(errEl);
@@ -450,6 +519,9 @@
             (pay ? '<span class="pay-status status ' + pay.status + '">' + pay.status + '</span>' : '') +
           '</div>' +
           '<div class="emp-wage">' + wageLabel + '</div>' +
+          (pay ? '<div class="closed-banner ' + (pay.status === 'จ่ายแล้ว' ? 'paid' : 'pending') + '">' +
+            (pay.status === 'จ่ายแล้ว' ? '💰 จ่ายแล้ว' : '✅ ปิดยอดแล้ว — รอจ่าย') +
+            ' • ' + Number(pay.total_amount || 0).toLocaleString() + ' บาท</div>' : '') +
           (pay ? '<div class="pay-info">' +
             pay.payment_id + ' • ปิดยอด ' + escape_(pay.closed_at) +
             (pay.extra_amount ? ' • พิเศษ ' + Number(pay.extra_amount).toLocaleString() : '') +
@@ -715,7 +787,11 @@
         '</div>';
       }).join('') || '<div class="muted">ยังไม่มีประวัติเช็คอินในรอบนี้</div>';
 
-      hbody.innerHTML =
+      const head = '<div class="detail-head">' + avatarImg_(r.selfie_url, '') +
+        '<div><div style="font-weight:700">' + escape_(r.displayName || '') +
+        (r.nickname ? ' (' + escape_(r.nickname) + ')' : '') + '</div>' +
+        '<div class="sub">' + escape_(r.employeeId || '') + '</div></div></div>';
+      hbody.innerHTML = head +
         '<div class="history-section"><h3>รอบจ่าย</h3>' + payments + '</div>' +
         '<div class="history-section"><h3>เช็คอิน</h3>' + checkins + '</div>';
     }
@@ -737,15 +813,25 @@
         .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
+    // แปลง Google Drive URL → thumbnail URL ที่โชว์ในแท็ก <img> ได้
+    function driveThumb_(url) {
+      if (!url) return '';
+      let m = String(url).match(/\/file\/d\/([^\/?]+)/);
+      if (m) return 'https://drive.google.com/thumbnail?id=' + m[1] + '&sz=w400';
+      m = String(url).match(/[?&]id=([^&]+)/);
+      if (m) return 'https://drive.google.com/thumbnail?id=' + m[1] + '&sz=w400';
+      return url;
+    }
+    function avatarImg_(url, cls) {
+      const t = driveThumb_(url);
+      return t ? '<img class="' + (cls || 'emp-thumb') + '" src="' + escape_(t) + '" alt="" referrerpolicy="no-referrer" />' : '';
+    }
+
     refreshEl.addEventListener('click', load);
     periodEl.addEventListener('change', load);
 
-    // activity log — lazy load + refresh ทุกครั้งที่กดเปิด
-    const logSection = document.getElementById('log-section');
+    // activity log — โหลดตอนเข้าหน้า (เรียกจาก showView)
     const logBody = document.getElementById('log-body');
-    logSection.addEventListener('toggle', function () {
-      if (logSection.open) loadOwnerLogs();
-    });
 
     async function loadOwnerLogs() {
       logBody.innerHTML = '<div class="muted">กำลังโหลด...</div>';
@@ -821,16 +907,11 @@
     }
 
     // ===== ตั้งค่าระบบ (P2) =====
-    const settingsSection = document.getElementById('settings-section');
     const setWageDefault = document.getElementById('set-wage-default');
     const setGrace = document.getElementById('set-grace');
     const setStart = document.getElementById('set-start');
     const settingsMsg = document.getElementById('settings-msg');
     let settingsLoaded = false;
-
-    settingsSection.addEventListener('toggle', function () {
-      if (settingsSection.open && !settingsLoaded) loadSettings();
-    });
 
     async function loadSettings() {
       settingsMsg.textContent = 'กำลังโหลด...';
@@ -887,14 +968,10 @@
     }
 
     // ===== P5: พนักงานทั้งหมด =====
-    const allEmpSection = document.getElementById('all-emp-section');
     const allEmpList = document.getElementById('all-emp-list');
     let allEmpCache = null;
     let empFilter = 'active';
 
-    allEmpSection.addEventListener('toggle', function () {
-      if (allEmpSection.open && !allEmpCache) loadAllEmployees();
-    });
     document.querySelectorAll('#emp-filter button').forEach(function (b) {
       b.addEventListener('click', function () {
         document.querySelectorAll('#emp-filter button').forEach(function (x) { x.classList.remove('active'); });
@@ -927,7 +1004,8 @@
         const wage = e.daily_wage == null ? def + ' (def)' : Number(e.daily_wage).toLocaleString();
         const term = e.active ? '' : '<span class="tag-term">เลิกจ้าง</span>';
         return '<div class="list-row' + (e.active ? '' : ' terminated') + '" data-emp="' + e.employee_id + '">' +
-          '<div><div><b>' + escape_(e.display_name) + '</b>' + nick + ' ' + term + '</div>' +
+          avatarImg_(e.selfie_url) +
+          '<div style="flex:1"><div><b>' + escape_(e.display_name) + '</b>' + nick + ' ' + term + '</div>' +
           '<div class="sub">' + escape_(e.employee_id) + ' • ' + escape_(e.phone || '-') +
           ' • มา ' + e.times_worked + ' ครั้ง • ค่าจ้าง ' + wage + '</div></div>' +
           '<div style="text-align:right"><div><b>' + Number(e.total_earned).toLocaleString() + '฿</b></div>' +
@@ -961,6 +1039,9 @@
             (p.paid_at ? ' • จ่าย ' + escape_(p.paid_at) : '') + slip + '</div></div>';
         }).join('') || '<div class="muted">ยังไม่มีรอบจ่าย</div>';
         dbody.innerHTML =
+          '<div class="detail-head">' + avatarImg_(r.selfie_url, '') +
+            '<div><div style="font-weight:700">' + escape_(r.display_name) + (r.nickname ? ' (' + escape_(r.nickname) + ')' : '') + '</div>' +
+            '<div class="sub">' + escape_(r.employee_id) + '</div></div></div>' +
           '<div class="rep-summary">' +
             '<div class="box"><div class="n">' + r.days_worked + '</div><div class="l">มาทำงาน(ครั้ง)</div></div>' +
             '<div class="box"><div class="n">' + Number(r.total_earned).toLocaleString() + '</div><div class="l">ได้รวม ฿</div></div>' +
