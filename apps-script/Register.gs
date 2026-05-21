@@ -12,7 +12,7 @@
 
 function register(payload) {
   const required = [
-    'lineUserId', 'displayName', 'phone',
+    'lineUserId', 'displayName', 'nickname', 'phone',
     'bankName', 'bankAccountNo', 'bankAccountName',
     'selfieBase64', 'idCardBase64',
   ];
@@ -49,7 +49,7 @@ function register(payload) {
     const employeeId = nextEmployeeId();
     const sheetId = PropertiesService.getScriptProperties().getProperty('SHEET_ID');
     const sh = SpreadsheetApp.openById(sheetId).getSheetByName('Employees');
-    // header order: employee_id, line_user_id, display_name, phone, bank_name, bank_account_no, bank_account_name, selfie_url, id_card_url, is_active, registered_at
+    // header order: employee_id, line_user_id, display_name, phone, bank_name, bank_account_no, bank_account_name, selfie_url, id_card_url, is_active, registered_at, nickname
     sh.appendRow([
       employeeId,
       payload.lineUserId,
@@ -62,6 +62,7 @@ function register(payload) {
       idCardUrl,
       true,
       nowBangkok(),
+      payload.nickname,
     ]);
 
     logInfo('register', 'created employee', { employeeId: employeeId, lineUserId: payload.lineUserId });

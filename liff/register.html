@@ -55,13 +55,14 @@
     <div id="error" class="error" style="display:none"></div>
     <div id="success" class="success-banner" style="display:none"></div>
 
-    <div class="label">LINE User ID</div>
-    <div id="userid" class="userid-box loading">กำลังโหลด...</div>
-
     <form id="form" style="display:none">
       <div class="field">
         <div class="label">ชื่อ-นามสกุล</div>
         <input type="text" name="displayName" required maxlength="50" />
+      </div>
+      <div class="field">
+        <div class="label">ชื่อเล่น</div>
+        <input type="text" name="nickname" required maxlength="30" />
       </div>
       <div class="field">
         <div class="label">เบอร์โทร</div>
@@ -131,7 +132,6 @@
     import { showError, clearError } from './js/utils.js';
     import { startCamera, captureFromVideo, stopCamera } from './js/camera.js';
 
-    const useridEl = document.getElementById('userid');
     const errEl    = document.getElementById('error');
     const okEl     = document.getElementById('success');
     const form     = document.getElementById('form');
@@ -184,8 +184,6 @@
       try { await initAuth(CONFIG.LIFF_ID_REGISTER); }
       catch (e) { showError(errEl, 'LIFF init: ' + e.message); return; }
 
-      useridEl.textContent = state.lineUserId;
-      useridEl.classList.remove('loading');
       if (state.profile?.displayName) form.displayName.value = state.profile.displayName;
       form.style.display = 'block';
     }
@@ -233,6 +231,7 @@
         const result = await api.post('register', {
           lineUserId:      state.lineUserId,
           displayName:     form.displayName.value.trim(),
+          nickname:        form.nickname.value.trim(),
           phone:           form.phone.value.trim(),
           bankName:        form.bankName.value,
           bankAccountNo:   form.bankAccountNo.value.trim(),
