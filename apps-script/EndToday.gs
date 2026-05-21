@@ -217,7 +217,6 @@ function buildEndTodayBubble_(w, grace) {
 
   const bodyContents = [
     { type: 'text', text: w.display_name + nick, weight: 'bold', size: 'md', wrap: true },
-    { type: 'text', text: w.employee_id, size: 'xxs', color: '#6b7280' },
     { type: 'separator', margin: 'sm' },
     infoRow_('เข้างาน', inTime),
     infoRow_('สแกน', w.scan_count + '/4'),

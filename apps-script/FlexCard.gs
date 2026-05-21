@@ -179,7 +179,7 @@ function buildScanProgressCard(args) {
             size: 'full', aspectMode: 'cover', aspectRatio: '1:1',
           },
           { type: 'separator', margin: 'sm' },
-          infoRow_('พนักงาน', args.employeeId + ' — ' + args.displayName + (args.nickname ? ' (' + args.nickname + ')' : '')),
+          infoRow_('พนักงาน', args.displayName + (args.nickname ? ' (' + args.nickname + ')' : '')),
           infoRowColored_('ระยะ', distanceText, distanceColor),
           infoRow_('สแกนแล้ว', args.scanCount + '/4'),
           ...(args.isLate ? [{

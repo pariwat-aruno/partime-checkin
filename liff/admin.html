@@ -515,8 +515,7 @@
 
         return '<div class="emp-row">' +
           '<div class="emp-head">' +
-            '<div><span class="emp-name">' + escape_(e.display_name) + nick + '</span> ' +
-              '<span class="emp-id">' + escape_(e.employee_id) + '</span></div>' +
+            '<div><span class="emp-name">' + escape_(e.display_name) + nick + '</span></div>' +
             (pay ? '<span class="pay-status status ' + pay.status + '">' + pay.status + '</span>' : '') +
           '</div>' +
           '<div class="emp-wage">' + wageLabel + '</div>' +
@@ -572,13 +571,13 @@
 
     async function openPending(employeeId) {
       pmodal.hidden = false;
-      ptitle.textContent = 'รออนุมัติ — ' + employeeId;
+      ptitle.textContent = 'รออนุมัติ — ' + empName_(employeeId);
       pbody.innerHTML = '<div class="muted">กำลังโหลด...</div>';
       try {
         const r = await api.post('getPendingForEmployee', {
           lineUserId: state.lineUserId, employeeId: employeeId,
         });
-        ptitle.textContent = 'รออนุมัติ — ' + r.displayName + ' (' + r.employeeId + ')';
+        ptitle.textContent = 'รออนุมัติ — ' + r.displayName + (r.nickname ? ' (' + r.nickname + ')' : '');
         renderPendingItems(r.items);
       } catch (e) {
         pbody.innerHTML = '<div class="error">ผิดพลาด: ' + (e.message || e.code) + '</div>';
@@ -652,8 +651,8 @@
         adjustmentNote = window.prompt('หมายเหตุเงินพิเศษ/OT', '') || '';
       }
       const msg = confirm
-        ? 'ปิดยอด ' + employeeId + ' รอบ ' + period + ' (มี pending ค้าง — ปิดเลยจะไม่นับ pending) ยืนยัน?'
-        : 'ปิดยอด ' + employeeId + ' รอบ ' + period + ' ?';
+        ? 'ปิดยอด ' + empName_(employeeId) + ' รอบ ' + period + ' (มี pending ค้าง — ปิดเลยจะไม่นับ pending) ยืนยัน?'
+        : 'ปิดยอด ' + empName_(employeeId) + ' รอบ ' + period + ' ?';
       if (!window.confirm(msg)) return;
       try {
         const result = await api.post('closePeriod', {
@@ -687,7 +686,7 @@
     }
 
     async function doCloseDaily(employeeId) {
-      if (!window.confirm('ปิดยอดเฉพาะวันนี้ของ ' + employeeId + ' ?')) return;
+      if (!window.confirm('ปิดยอดเฉพาะวันนี้ของ ' + empName_(employeeId) + ' ?')) return;
       try {
         const r = await api.post('closeDaily', { lineUserId: state.lineUserId, employeeId: employeeId, confirm: true });
         alert('ปิดยอดวันนี้สำเร็จ — ' + Number(r.total).toLocaleString() + ' บาท');
@@ -743,7 +742,7 @@
 
     async function openHistory(employeeId) {
       hmodal.hidden = false;
-      htitle.textContent = 'ประวัติ — ' + employeeId;
+      htitle.textContent = 'ประวัติ — ' + empName_(employeeId);
       hbody.innerHTML = '<div class="muted">กำลังโหลด...</div>';
       try {
         const r = await api.post('getEmployeeHistory', {
@@ -751,7 +750,7 @@
           employeeId: employeeId,
           period: periodEl.value,
         });
-        htitle.textContent = 'ประวัติ — ' + r.displayName + ' (' + r.employeeId + ')';
+        htitle.textContent = 'ประวัติ — ' + r.displayName + (r.nickname ? ' (' + r.nickname + ')' : '');
         renderHistory(r);
       } catch (e) {
         hbody.innerHTML = '<div class="error">ผิดพลาด: ' + escape_(e.message || e.code) + '</div>';
@@ -790,8 +789,7 @@
 
       const head = '<div class="detail-head">' + avatarImg_(r.selfie_url, '') +
         '<div><div style="font-weight:700">' + escape_(r.displayName || '') +
-        (r.nickname ? ' (' + escape_(r.nickname) + ')' : '') + '</div>' +
-        '<div class="sub">' + escape_(r.employeeId || '') + '</div></div></div>';
+        (r.nickname ? ' (' + escape_(r.nickname) + ')' : '') + '</div></div></div>';
       hbody.innerHTML = head +
         '<div class="history-section"><h3>รอบจ่าย</h3>' + payments + '</div>' +
         '<div class="history-section"><h3>เช็คอิน</h3>' + checkins + '</div>';
@@ -826,6 +824,13 @@
     function avatarImg_(url, cls) {
       const t = driveThumb_(url);
       return t ? '<img class="' + (cls || 'emp-thumb') + '" src="' + escape_(t) + '" alt="" referrerpolicy="no-referrer" />' : '';
+    }
+    // ชื่อจริง (ชื่อเล่น) จาก employee_id — ใช้แทนการโชว์รหัส
+    function empName_(id) {
+      let e = (lastEmployees || []).find(function (x) { return x.employee_id === id; });
+      if (!e && allEmpCache) e = allEmpCache.employees.find(function (x) { return x.employee_id === id; });
+      if (!e) return id;
+      return e.display_name + (e.nickname ? ' (' + e.nickname + ')' : '');
     }
 
     refreshEl.addEventListener('click', load);
@@ -953,7 +958,7 @@
 
     async function doSetWage(employeeId, currentWage) {
       const raw = window.prompt(
-        'ค่าจ้าง/วัน ของ ' + employeeId + ' (เว้นว่าง = ใช้ค่าเริ่มต้น)',
+        'ค่าจ้าง/วัน ของ ' + empName_(employeeId) + ' (เว้นว่าง = ใช้ค่าเริ่มต้น)',
         currentWage || ''
       );
       if (raw == null) return; // cancel
@@ -1009,7 +1014,7 @@
         return '<div class="list-row' + (e.active ? '' : ' terminated') + '" data-emp="' + e.employee_id + '">' +
           avatarImg_(e.selfie_url) +
           '<div style="flex:1"><div><b>' + escape_(e.display_name) + '</b>' + nick + ' ' + badge + '</div>' +
-          '<div class="sub">' + escape_(e.employee_id) + ' • ' + escape_(e.phone || '-') +
+          '<div class="sub">' + escape_(e.phone || '-') +
           ' • มา ' + e.times_worked + ' ครั้ง • ค่าจ้าง ' + wage + '</div></div>' +
           '<div style="text-align:right"><div><b>' + Number(e.total_earned).toLocaleString() + '฿</b></div>' +
           '<div class="sub">ได้รวม</div></div>' +
@@ -1028,7 +1033,7 @@
 
     async function openDetail(employeeId) {
       dmodal.hidden = false;
-      dtitle.textContent = 'รายละเอียด — ' + employeeId;
+      dtitle.textContent = 'รายละเอียด';
       dbody.innerHTML = '<div class="muted">กำลังโหลด...</div>';
       try {
         const r = await api.post('getEmployeeDetail', { lineUserId: state.lineUserId, employeeId: employeeId });
@@ -1043,8 +1048,7 @@
         }).join('') || '<div class="muted">ยังไม่มีรอบจ่าย</div>';
         dbody.innerHTML =
           '<div class="detail-head">' + avatarImg_(r.selfie_url, '') +
-            '<div><div style="font-weight:700">' + escape_(r.display_name) + (r.nickname ? ' (' + escape_(r.nickname) + ')' : '') + '</div>' +
-            '<div class="sub">' + escape_(r.employee_id) + '</div></div></div>' +
+            '<div><div style="font-weight:700">' + escape_(r.display_name) + (r.nickname ? ' (' + escape_(r.nickname) + ')' : '') + '</div></div></div>' +
           '<div class="rep-summary">' +
             '<div class="box"><div class="n">' + r.days_worked + '</div><div class="l">มาทำงาน(ครั้ง)</div></div>' +
             '<div class="box"><div class="n">' + Number(r.total_earned).toLocaleString() + '</div><div class="l">ได้รวม ฿</div></div>' +
