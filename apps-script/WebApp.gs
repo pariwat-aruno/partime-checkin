@@ -199,13 +199,22 @@ function handleMessageEvent_(ev) {
     return replyDailyReport_(ev, reportMatch[1] || null);
   }
 
+  // /today — รายชื่อคนที่มาเช็คชื่อวันนี้ (เจ้าของ)
+  if (lower === '/today' || lower === 'today' || lower === 'วันนี้') {
+    return replyTodayCommand_(ev);
+  }
+  // /endtoday — เมนูปิดวัน: ตัดสินเต็ม/ครึ่ง/ชม + จ้างต่อ/เลิกจ้าง (เจ้าของ)
+  if (lower === '/endtoday' || lower === 'endtoday' || lower === 'ปิดวัน') {
+    return replyEndTodayCommand_(ev);
+  }
+
   return replyText(ev.replyToken,
     'คำสั่งที่ใช้ได้:\n' +
     '"ลงทะเบียน" — สมัครครั้งแรก (ลิงก์)\n' +
     '"id" — รับ LINE User ID\n' +
-    '"รอ" — รายการรออนุมัติ (เจ้าของ)\n' +
-    '"รายงาน" หรือ "รายงาน 2026-05-10" — สรุปวัน (เจ้าของ)\n\n' +
-    'หรือใช้เมนูด้านล่าง: เช็คอิน / ดูยอด\n\n' +
+    '"/today" — ใครมาวันนี้บ้าง (เจ้าของ)\n' +
+    '"/endtoday" — เมนูปิดวัน/สรุปค่าจ้าง (เจ้าของ)\n' +
+    '"รอ" — รายการค้างตัดสิน (เจ้าของ)\n\n' +
     'บริษัท วอร์ด้า สกินแคร์ จำกัด');
 }
 
@@ -362,7 +371,34 @@ function handlePostback_(ev) {
   }
 
   const data = parsePostbackData_(ev.postback.data);
-  if (!data.action || !data.id) {
+  if (!data.action) {
+    logWarn('postback', 'invalid data', ev.postback.data);
+    return replyText(ev.replyToken, 'ข้อมูลผิดพลาด');
+  }
+
+  // ตัดสินค่าจ้างจากเมนูปิดวัน (P4)
+  if (data.action === 'decide') {
+    const map = decodeDayTypeButton_(data.type);
+    if (!map || !data.id) return replyText(ev.replyToken, 'ข้อมูลผิดพลาด');
+    const r = decideCheckin_(data.id, map.dayType, map.hours, userId);
+    if (!r.ok) return replyText(ev.replyToken, '❌ ' + r.error);
+    const dt = { full: 'เต็มวัน', half: 'ครึ่งวัน', custom: map.hours + ' ชม' }[r.dayType] || r.dayType;
+    let msg = '✓ ' + r.empName + ' — ' + dt + ' = ' + Number(r.wage).toLocaleString() + ' บาท';
+    if (r.deduction > 0) msg += '\n(หักมาสาย ' + r.lateMinutes + ' นาที = ' + r.deduction + ' บาท)';
+    return replyText(ev.replyToken, msg);
+  }
+
+  // เลิกจ้าง (P4)
+  if (data.action === 'terminate') {
+    if (!data.emp) return replyText(ev.replyToken, 'ข้อมูลผิดพลาด');
+    const r = terminateEmployee_(data.emp, userId);
+    if (!r.ok) return replyText(ev.replyToken, '❌ ' + r.error);
+    let msg = '🚪 เลิกจ้าง ' + r.empName + ' แล้ว';
+    if (r.closed && r.closed.ok) msg += '\nปิดยอดวันนี้ ' + Number(r.closed.total).toLocaleString() + ' บาท';
+    return replyText(ev.replyToken, msg);
+  }
+
+  if (!data.id) {
     logWarn('postback', 'invalid data', ev.postback.data);
     return replyText(ev.replyToken, 'ข้อมูลผิดพลาด');
   }

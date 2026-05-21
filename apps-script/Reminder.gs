@@ -153,6 +153,13 @@ function tickReminders() {
       sendEndOfWorkBroadcast_();
       state.sent.push('eod'); saveReminderState_(state);
     }
+
+    // เมนูปิดวันหา owner — ที่ endtoday_time (17:30 default)
+    const endtoday = cfg.endtoday_time || '17:30';
+    if (state.sent.indexOf('endtoday') < 0 && hhmmInWindow_(hhmm, endtoday, 3)) {
+      sendEndTodayMenu_();
+      state.sent.push('endtoday'); saveReminderState_(state);
+    }
   } catch (err) {
     logError('tickReminders', err.message, '');
   }

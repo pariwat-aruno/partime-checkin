@@ -128,6 +128,7 @@ function readSheetConfig_(sheetId) {
   if (result.wage_default == null)       result.wage_default = 400;
   if (result.late_grace_minutes == null) result.late_grace_minutes = 15;
   if (result.work_start_time == null)    result.work_start_time = '08:00';
+  if (result.endtoday_time == null)      result.endtoday_time = '17:30';
 
   // validate required (owner_line_user_ids optional — fall back ไป Script Properties)
   const need = ['geofence_lat', 'geofence_lng', 'geofence_radius_m'];

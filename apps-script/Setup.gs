@@ -179,6 +179,7 @@ const CONFIG_DEFAULTS = {
   wage_default: 400,          // ค่าจ้าง/วัน เริ่มต้น (ใช้เมื่อพนักงานไม่ได้ตั้ง daily_wage)
   late_grace_minutes: 15,     // สายได้กี่นาทีก่อนเริ่มหัก
   work_start_time: '08:00',   // เวลาเริ่มงานมาตรฐาน (วัดมาสายจากตรงนี้)
+  endtoday_time: '17:30',     // เวลาเด้งเมนูปิดวันหา owner
   // legacy — เลิกใช้แล้ว (คิดจากสูตรแทน) แต่คงไว้กัน config validation เก่าพัง
   wage_full_day: 400,
   wage_half_day: 200,
