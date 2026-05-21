@@ -124,8 +124,13 @@ function readSheetConfig_(sheetId) {
     });
   }
 
+  // ค่าโมเดลคิดเงินใหม่ — ถ้ายังไม่ได้ seed ใน sheet ให้ fallback default (กันพังก่อน seed)
+  if (result.wage_default == null)       result.wage_default = 400;
+  if (result.late_grace_minutes == null) result.late_grace_minutes = 15;
+  if (result.work_start_time == null)    result.work_start_time = '08:00';
+
   // validate required (owner_line_user_ids optional — fall back ไป Script Properties)
-  const need = ['wage_full_day', 'wage_half_day', 'geofence_lat', 'geofence_lng', 'geofence_radius_m'];
+  const need = ['geofence_lat', 'geofence_lng', 'geofence_radius_m'];
   const miss = need.filter(function (k) { return result[k] == null; });
   if (miss.length) {
     throw new Error('missing keys in sheet Config: ' + miss.join(', '));

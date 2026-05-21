@@ -28,6 +28,9 @@ const SHEET_HEADERS = {
     'id_card_url',
     'is_active',
     'registered_at',
+    'nickname',         // ชื่อเล่น
+    'daily_wage',       // ค่าจ้าง/วัน รายบุคคล (ว่าง = ใช้ wage_default)
+    'terminated_at',    // วันเลิกจ้าง (ว่าง = ยังทำงาน)
   ],
   Checkins: [
     'checkin_id',
@@ -47,8 +50,11 @@ const SHEET_HEADERS = {
     'has_out_of_range',
     'scan_count',
     'status',
-    'day_type',
-    'wage',
+    'day_type',         // full | half | custom | absent
+    'work_hours',       // ใช้เมื่อ day_type=custom (เช่น 1,2,3)
+    'wage',             // ค่าจ้างสุทธิ (หลังหักมาสาย)
+    'late_minutes',     // นาทีที่มาสาย (จาก slot1)
+    'late_deduction',   // เงินที่ถูกหักจากมาสาย
     'approved_at',
   ],
   Payments: [
@@ -66,6 +72,7 @@ const SHEET_HEADERS = {
     'paid_at',
     'adjustment_note',
     'note',
+    'slip_url',         // URL สลิปโอนเงิน (อัปตอน mark paid)
   ],
   Logs: ['timestamp', 'level', 'function', 'message', 'payload'],
   Config: ['key', 'value'],
@@ -168,6 +175,11 @@ function ensureSheetWithHeaders_(ss, name, headers) {
 
 // ค่า default ของระบบ — แก้ตรงนี้ถ้าจะเปลี่ยนค่าจ้าง/พิกัด/รัศมี/owners/slot
 const CONFIG_DEFAULTS = {
+  // โมเดลคิดเงินใหม่ (รายชั่วโมง-นาที จากเวลาสแกน)
+  wage_default: 400,          // ค่าจ้าง/วัน เริ่มต้น (ใช้เมื่อพนักงานไม่ได้ตั้ง daily_wage)
+  late_grace_minutes: 15,     // สายได้กี่นาทีก่อนเริ่มหัก
+  work_start_time: '08:00',   // เวลาเริ่มงานมาตรฐาน (วัดมาสายจากตรงนี้)
+  // legacy — เลิกใช้แล้ว (คิดจากสูตรแทน) แต่คงไว้กัน config validation เก่าพัง
   wage_full_day: 400,
   wage_half_day: 200,
   geofence_lat: 18.82895270346188,
