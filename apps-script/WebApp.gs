@@ -70,6 +70,10 @@ function routeAction_(action, payload) {
     case 'restorePaymentPending': return restorePaymentPending(payload);
     case 'getEmployeeHistory':    return getEmployeeHistory(payload);
     case 'getOwnerLogs':          return getOwnerLogs(payload);
+    // settings + per-employee wage (P2)
+    case 'getSettings':           return getSettings(payload);
+    case 'saveSettings':          return saveSettings(payload);
+    case 'setEmployeeWage':       return setEmployeeWage(payload);
     default:
       return { ok: false, error: 'unknown_action', action: action };
   }

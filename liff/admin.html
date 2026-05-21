@@ -112,21 +112,31 @@
     .history-row .meta { color: var(--muted); font-size: 12px; line-height: 1.5; }
     .history-flag.danger { color: var(--reject); font-weight: 700; }
 
-    /* Activity log */
+    /* Activity log + settings (shared collapsible style) */
     #log-section { margin-top: 18px; }
-    #log-section > summary {
+    #settings-section { margin-bottom: 16px; }
+    #log-section > summary, #settings-section > summary {
       cursor: pointer; padding: 12px 14px; background: var(--bg);
       border: 1px solid var(--border); border-radius: 10px;
       font-weight: 600; font-size: 14px; color: var(--text);
       list-style: none; user-select: none;
     }
-    #log-section > summary::-webkit-details-marker { display: none; }
-    #log-section[open] > summary { border-radius: 10px 10px 0 0; background: var(--cherry-tint); }
+    #log-section > summary::-webkit-details-marker,
+    #settings-section > summary::-webkit-details-marker { display: none; }
+    #log-section[open] > summary, #settings-section[open] > summary {
+      border-radius: 10px 10px 0 0; background: var(--cherry-tint);
+    }
+    #settings-body {
+      border: 1px solid var(--border); border-top: none;
+      border-radius: 0 0 10px 10px; padding: 14px; background: var(--white);
+    }
     #log-body {
       border: 1px solid var(--border); border-top: none;
       border-radius: 0 0 10px 10px; padding: 10px; background: var(--white);
       max-height: 60vh; overflow-y: auto;
     }
+    .emp-wage { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+    .emp-wage b { color: var(--cherry-dark); }
     .log-item {
       padding: 10px 8px; border-bottom: 1px solid var(--border);
       font-size: 13px;
@@ -163,6 +173,26 @@
     <div id="loading" class="muted">กำลังโหลด...</div>
 
     <div id="content" style="display:none">
+      <details id="settings-section">
+        <summary>⚙️ ตั้งค่าระบบ</summary>
+        <div id="settings-body">
+          <div class="field">
+            <div class="label">ค่าจ้างเริ่มต้น (บาท/วัน)</div>
+            <input type="number" id="set-wage-default" min="1" step="1" />
+          </div>
+          <div class="field">
+            <div class="label">อนุญาตให้สายได้ (นาที) ก่อนเริ่มหัก</div>
+            <input type="number" id="set-grace" min="0" step="1" />
+          </div>
+          <div class="field">
+            <div class="label">เวลาเริ่มงานมาตรฐาน</div>
+            <input type="time" id="set-start" />
+          </div>
+          <button id="btn-save-settings" class="btn-primary">บันทึกการตั้งค่า</button>
+          <div id="settings-msg" class="muted" style="margin-top:8px"></div>
+        </div>
+      </details>
+
       <div class="period-picker">
         <input type="month" id="period" />
         <button id="btn-refresh" class="btn-primary">โหลด</button>
@@ -244,6 +274,7 @@
       periodEl.value = defaultPeriod();
       loadingEl.style.display = 'none';
       contentEl.style.display = 'block';
+      try { await loadSettings(); } catch (_) {} // รู้ค่าจ้าง default ก่อน render
       await load();
     }
 
@@ -289,14 +320,21 @@
           actions = '<button class="btn-primary" disabled>จ่ายแล้ว</button>' +
             '<button class="btn-warning" data-action="restore" data-pid="' + pay.payment_id + '">แก้เป็นรอจ่าย</button>';
         }
+        actions += '<button class="btn-secondary" data-action="wage" data-emp="' + e.employee_id + '" data-wage="' + (e.daily_wage == null ? '' : e.daily_wage) + '">แก้ค่าจ้าง</button>';
         actions += '<button class="btn-secondary" data-action="history" data-emp="' + e.employee_id + '">ประวัติ</button>';
+
+        const nick = e.nickname ? ' (' + escape_(e.nickname) + ')' : '';
+        const wageLabel = e.daily_wage == null
+          ? 'ค่าจ้าง: <b>' + (window.__defaultWage || '?') + '</b> บาท/วัน (default)'
+          : 'ค่าจ้าง: <b>' + Number(e.daily_wage).toLocaleString() + '</b> บาท/วัน';
 
         return '<div class="emp-row">' +
           '<div class="emp-head">' +
-            '<div><span class="emp-name">' + escape_(e.display_name) + '</span> ' +
+            '<div><span class="emp-name">' + escape_(e.display_name) + nick + '</span> ' +
               '<span class="emp-id">' + escape_(e.employee_id) + '</span></div>' +
             (pay ? '<span class="pay-status status ' + pay.status + '">' + pay.status + '</span>' : '') +
           '</div>' +
+          '<div class="emp-wage">' + wageLabel + '</div>' +
           (pay ? '<div class="pay-info">' +
             pay.payment_id + ' • ปิดยอด ' + escape_(pay.closed_at) +
             (pay.extra_amount ? ' • พิเศษ ' + Number(pay.extra_amount).toLocaleString() : '') +
@@ -324,6 +362,7 @@
           if (a === 'close-force')  return doClose(btn.dataset.emp, true);
           if (a === 'paid')         return doMarkPaid(btn.dataset.pid);
           if (a === 'restore')      return doRestorePaid(btn.dataset.pid);
+          if (a === 'wage')         return doSetWage(btn.dataset.emp, btn.dataset.wage);
           if (a === 'history')      return openHistory(btn.dataset.emp);
         });
       });
@@ -618,6 +657,72 @@
       const m = String(ts).match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
       if (!m) return String(ts);
       return m[3] + '/' + m[2] + ' ' + m[4] + ':' + m[5];
+    }
+
+    // ===== ตั้งค่าระบบ (P2) =====
+    const settingsSection = document.getElementById('settings-section');
+    const setWageDefault = document.getElementById('set-wage-default');
+    const setGrace = document.getElementById('set-grace');
+    const setStart = document.getElementById('set-start');
+    const settingsMsg = document.getElementById('settings-msg');
+    let settingsLoaded = false;
+
+    settingsSection.addEventListener('toggle', function () {
+      if (settingsSection.open && !settingsLoaded) loadSettings();
+    });
+
+    async function loadSettings() {
+      settingsMsg.textContent = 'กำลังโหลด...';
+      try {
+        const r = await api.post('getSettings', { lineUserId: state.lineUserId });
+        setWageDefault.value = r.settings.wage_default;
+        setGrace.value = r.settings.late_grace_minutes;
+        setStart.value = r.settings.work_start_time;
+        window.__defaultWage = Number(r.settings.wage_default).toLocaleString();
+        settingsLoaded = true;
+        settingsMsg.textContent = '';
+      } catch (e) {
+        settingsMsg.textContent = 'โหลดไม่สำเร็จ: ' + (e.message || e.code);
+      }
+    }
+
+    document.getElementById('btn-save-settings').addEventListener('click', async function () {
+      settingsMsg.textContent = 'กำลังบันทึก...';
+      try {
+        const r = await api.post('saveSettings', {
+          lineUserId: state.lineUserId,
+          wage_default: Number(setWageDefault.value),
+          late_grace_minutes: Number(setGrace.value),
+          work_start_time: setStart.value,
+        });
+        window.__defaultWage = Number(r.settings.wage_default).toLocaleString();
+        settingsMsg.textContent = '✓ บันทึกแล้ว';
+        await load();
+      } catch (e) {
+        const map = {
+          invalid_wage_default: 'ค่าจ้างเริ่มต้นต้องเป็นตัวเลข > 0',
+          invalid_grace: 'นาทีที่อนุญาตให้สายต้องเป็นตัวเลข ≥ 0',
+          invalid_work_start_time: 'เวลาเริ่มงานไม่ถูกต้อง (HH:mm)',
+        };
+        settingsMsg.textContent = 'ผิดพลาด: ' + (map[e.code] || e.message || e.code);
+      }
+    });
+
+    async function doSetWage(employeeId, currentWage) {
+      const raw = window.prompt(
+        'ค่าจ้าง/วัน ของ ' + employeeId + ' (เว้นว่าง = ใช้ค่าเริ่มต้น)',
+        currentWage || ''
+      );
+      if (raw == null) return; // cancel
+      const val = String(raw).replace(/,/g, '').trim();
+      try {
+        await api.post('setEmployeeWage', {
+          lineUserId: state.lineUserId, employeeId: employeeId, dailyWage: val,
+        });
+        await load();
+      } catch (e) {
+        alert('ผิดพลาด: ' + (e.code === 'invalid_wage' ? 'ค่าจ้างต้องเป็นตัวเลข > 0' : (e.message || e.code)));
+      }
     }
 
     boot();

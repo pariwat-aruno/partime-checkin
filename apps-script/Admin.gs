@@ -36,9 +36,25 @@ function getOwnerDashboard(payload) {
     const iId = eh.indexOf('employee_id');
     const iName = eh.indexOf('display_name');
     const iActive = eh.indexOf('is_active');
+    const iNick = eh.indexOf('nickname');
+    const iPhone = eh.indexOf('phone');
+    const iBankNo = eh.indexOf('bank_account_no');
+    const iBankName = eh.indexOf('bank_name');
+    const iWage = eh.indexOf('daily_wage');
+    const iTerm = eh.indexOf('terminated_at');
     ed.forEach(function (row) {
+      const terminated = iTerm >= 0 && row[iTerm];
+      if (terminated) return; // dashboard = เฉพาะที่ยังทำงาน
       if (row[iActive] !== true && String(row[iActive]).toLowerCase() !== 'true') return;
-      employees.push({ employee_id: row[iId], display_name: row[iName] });
+      employees.push({
+        employee_id: row[iId],
+        display_name: row[iName],
+        nickname: iNick >= 0 ? row[iNick] : '',
+        phone: iPhone >= 0 ? row[iPhone] : '',
+        bank_account_no: iBankNo >= 0 ? row[iBankNo] : '',
+        bank_name: iBankName >= 0 ? row[iBankName] : '',
+        daily_wage: iWage >= 0 && row[iWage] !== '' ? Number(row[iWage]) : null,
+      });
     });
   }
 
@@ -113,6 +129,11 @@ function getOwnerDashboard(payload) {
     return {
       employee_id: emp.employee_id,
       display_name: emp.display_name,
+      nickname: emp.nickname,
+      phone: emp.phone,
+      bank_account_no: emp.bank_account_no,
+      bank_name: emp.bank_name,
+      daily_wage: emp.daily_wage,
       approved_full: agg.full,
       approved_half: agg.half,
       total_amount: agg.total,
