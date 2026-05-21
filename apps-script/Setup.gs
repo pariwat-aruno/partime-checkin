@@ -56,6 +56,7 @@ const SHEET_HEADERS = {
     'late_minutes',     // นาทีที่มาสาย (จาก slot1)
     'late_deduction',   // เงินที่ถูกหักจากมาสาย
     'approved_at',
+    'payment_id',       // ผูกกับ Payment ที่ปิดยอดแล้ว (กันนับซ้ำ daily/monthly)
   ],
   Payments: [
     'payment_id',

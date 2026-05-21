@@ -137,6 +137,8 @@
     }
     .emp-wage { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
     .emp-wage b { color: var(--cherry-dark); }
+    .bulk-bar { display: flex; gap: 8px; margin-bottom: 12px; }
+    .bulk-bar button { flex: 1; padding: 11px; font-size: 13px; }
 
     /* P5 panels */
     .panel { margin-bottom: 12px; }
@@ -251,6 +253,10 @@
       <div class="period-picker">
         <input type="month" id="period" />
         <button id="btn-refresh" class="btn-primary">โหลด</button>
+      </div>
+      <div class="bulk-bar">
+        <button id="btn-bulk-close" class="btn-primary">ปิดยอดทุกคน</button>
+        <button id="btn-bulk-pay" class="btn-secondary">จ่ายแล้วทุกคน(รอจ่าย)</button>
       </div>
       <div id="emp-list"></div>
 
@@ -403,7 +409,9 @@
       }
     }
 
+    let lastEmployees = [];
     function renderList(employees) {
+      lastEmployees = employees || [];
       if (!employees || employees.length === 0) {
         listEl.innerHTML = '<div class="muted">ไม่มีพาร์ทไทม์ active</div>';
         return;
@@ -415,6 +423,7 @@
         if (!pay) {
           actions = '<button class="btn-primary" data-action="close" data-emp="' + e.employee_id + '">' +
             'ปิดยอด ' + total + ' บาท</button>';
+          actions += '<button class="btn-secondary" data-action="close-daily" data-emp="' + e.employee_id + '">ปิดยอดวันนี้</button>';
           if (e.pending > 0) {
             actions += '<button class="btn-warning" data-action="close-force" data-emp="' + e.employee_id + '">' +
               'ปิดทั้งที่มี pending ' + e.pending + '</button>';
@@ -465,6 +474,7 @@
         btn.addEventListener('click', function () {
           const a = btn.dataset.action;
           if (a === 'close')        return doClose(btn.dataset.emp, false);
+          if (a === 'close-daily')  return doCloseDaily(btn.dataset.emp);
           if (a === 'close-force')  return doClose(btn.dataset.emp, true);
           if (a === 'paid')         return doMarkPaid(btn.dataset.pid);
           if (a === 'restore')      return doRestorePaid(btn.dataset.pid);
@@ -595,9 +605,54 @@
 
     async function doMarkPaid(paymentId) {
       if (!window.confirm('ยืนยันว่าโอนเงินสำหรับ ' + paymentId + ' แล้ว?')) return;
+      const slip = window.prompt('ลิงก์สลิปโอนเงิน (เว้นว่างได้)', '') || '';
       try {
-        await api.post('markPaid', { lineUserId: state.lineUserId, paymentId: paymentId });
+        await api.post('markPaid', { lineUserId: state.lineUserId, paymentId: paymentId, slipUrl: slip });
         alert('ทำเครื่องหมายจ่ายแล้ว');
+        await load();
+      } catch (e) { alert('ผิดพลาด: ' + (e.message || e.code)); }
+    }
+
+    async function doCloseDaily(employeeId) {
+      if (!window.confirm('ปิดยอดเฉพาะวันนี้ของ ' + employeeId + ' ?')) return;
+      try {
+        const r = await api.post('closeDaily', { lineUserId: state.lineUserId, employeeId: employeeId, confirm: true });
+        alert('ปิดยอดวันนี้สำเร็จ — ' + Number(r.total).toLocaleString() + ' บาท');
+        await load();
+      } catch (e) {
+        const map = { nothing_to_close: 'วันนี้ยังไม่มียอดอนุมัติให้ปิด', payment_already_closed: 'ปิดยอดวันนี้ไปแล้ว' };
+        alert(map[e.code] || ('ผิดพลาด: ' + (e.message || e.code)));
+      }
+    }
+
+    document.getElementById('btn-bulk-close').addEventListener('click', doBulkClose);
+    document.getElementById('btn-bulk-pay').addEventListener('click', doBulkPay);
+
+    async function doBulkClose() {
+      const ids = lastEmployees.filter(function (e) { return !e.payment && e.total_amount > 0; })
+        .map(function (e) { return e.employee_id; });
+      if (ids.length === 0) { alert('ไม่มีคนที่ต้องปิดยอด รอบ ' + periodEl.value); return; }
+      if (!window.confirm('ปิดยอด ' + ids.length + ' คน รอบ ' + periodEl.value + ' (รวม pending ถ้ามี) ?')) return;
+      try {
+        const r = await api.post('bulkClose', {
+          lineUserId: state.lineUserId, employeeIds: ids,
+          granularity: 'month', date: periodEl.value, confirm: true,
+        });
+        alert('ปิดยอดสำเร็จ ' + r.closed + ' คน รวม ' + Number(r.total).toLocaleString() + ' บาท' +
+          (r.failed ? ('\nไม่สำเร็จ ' + r.failed + ' คน') : ''));
+        await load();
+      } catch (e) { alert('ผิดพลาด: ' + (e.message || e.code)); }
+    }
+
+    async function doBulkPay() {
+      const ids = lastEmployees.filter(function (e) { return e.payment && e.payment.status === 'รอจ่าย'; })
+        .map(function (e) { return e.payment.payment_id; });
+      if (ids.length === 0) { alert('ไม่มีรายการที่รอจ่าย'); return; }
+      const slip = window.prompt('ลิงก์สลิปโอนเงิน (ใส่ร่วมกันทุกคน หรือเว้นว่าง)', '') || '';
+      if (!window.confirm('ทำเครื่องหมายจ่ายแล้ว ' + ids.length + ' รายการ?')) return;
+      try {
+        const r = await api.post('bulkMarkPaid', { lineUserId: state.lineUserId, paymentIds: ids, slipUrl: slip });
+        alert('บันทึกจ่ายแล้ว ' + r.paid + ' รายการ' + (r.failed ? ('\nไม่สำเร็จ ' + r.failed) : ''));
         await load();
       } catch (e) { alert('ผิดพลาด: ' + (e.message || e.code)); }
     }

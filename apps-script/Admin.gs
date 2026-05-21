@@ -184,6 +184,10 @@ function markPaid(payload) {
 
   sh.getRange(rowIdx, iStatus).setValue('จ่ายแล้ว');
   sh.getRange(rowIdx, iPaid).setValue(nowBangkok());
+  if (payload.slipUrl) {
+    const iSlip = headers.indexOf('slip_url');
+    if (iSlip >= 0) sh.getRange(rowIdx, iSlip + 1).setValue(payload.slipUrl);
+  }
 
   logInfo('markPaid', 'paid', { paymentId: payload.paymentId });
 

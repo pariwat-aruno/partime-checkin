@@ -75,6 +75,9 @@ function closePeriod(payload) {
       note: payload.isResign ? 'ลาออก' : '',
     });
 
+    // ผูก checkin ที่ถูกปิดเข้ากับ payment นี้ (กันนับซ้ำ)
+    stampCheckinsPaymentId_(ss, stats.rows, paymentId);
+
     logInfo('closePeriod', 'created payment', { paymentId: paymentId, employeeId: emp.employee_id, total: totalAmount });
 
     logOwnerAction(payload.lineUserId, 'close_period', paymentId, emp.display_name, {
@@ -160,24 +163,39 @@ function sumApprovedAndPending_(ss, employeeId, monthStr) {
   const iStatus = headers.indexOf('status');
   const iDayType = headers.indexOf('day_type');
   const iWage = headers.indexOf('wage');
+  const iPid = headers.indexOf('payment_id');
 
   let full = 0, half = 0, total = 0, pending = 0;
-  data.forEach(function (row) {
+  const rows = [];
+  data.forEach(function (row, i) {
     if (row[iEmp] !== employeeId) return;
     const d = row[iDate];
     const ym = (d instanceof Date)
       ? Utilities.formatDate(d, 'Asia/Bangkok', 'yyyy-MM')
       : String(d).substring(0, 7);
     if (ym !== monthStr) return;
+    // ข้ามที่ปิดยอดไปแล้ว (กันนับซ้ำ daily/monthly)
+    if (iPid >= 0 && row[iPid]) return;
     if (row[iStatus] === 'approved') {
       if (row[iDayType] === 'full') full++;
       if (row[iDayType] === 'half') half++;
       total += Number(row[iWage] || 0);
+      rows.push(i + 2);
     } else if (row[iStatus] === 'pending') {
       pending++;
     }
   });
-  return { full: full, half: half, total: total, pending: pending };
+  return { full: full, half: half, total: total, pending: pending, rows: rows };
+}
+
+/** stamp payment_id ลง Checkins rows ที่ถูกปิดยอด (กันนับซ้ำ) */
+function stampCheckinsPaymentId_(ss, rowNumbers, paymentId) {
+  if (!rowNumbers || rowNumbers.length === 0) return;
+  const sh = ss.getSheetByName('Checkins');
+  const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+  const iPid = headers.indexOf('payment_id');
+  if (iPid < 0) return;
+  rowNumbers.forEach(function (r) { sh.getRange(r, iPid + 1).setValue(paymentId); });
 }
 
 function normalizePaymentExtras_(payload) {
@@ -192,7 +210,7 @@ function normalizePaymentExtras_(payload) {
 }
 
 function ensurePaymentExtraColumns_(sh) {
-  const required = ['base_amount', 'extra_amount', 'ot_amount', 'adjustment_note'];
+  const required = ['base_amount', 'extra_amount', 'ot_amount', 'adjustment_note', 'slip_url'];
   const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
   required.forEach(function (h) {
     if (headers.indexOf(h) >= 0) return;

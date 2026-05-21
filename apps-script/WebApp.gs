@@ -79,6 +79,10 @@ function routeAction_(action, payload) {
     case 'getEmployeeDetail':     return getEmployeeDetail(payload);
     case 'getPaymentReport':      return getPaymentReport(payload);
     case 'getWorkHistory':        return getWorkHistory(payload);
+    // daily close + bulk (P6)
+    case 'closeDaily':            return closeDaily(payload);
+    case 'bulkClose':             return bulkClose(payload);
+    case 'bulkMarkPaid':          return bulkMarkPaid(payload);
     default:
       return { ok: false, error: 'unknown_action', action: action };
   }
